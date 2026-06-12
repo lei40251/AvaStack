@@ -1,0 +1,71 @@
+services:
+  avastack-orchestrator:
+    build:
+      context: ./services/orchestrator-go
+    environment:
+      PORT: ${ORCHESTRATOR_PORT:-8080}
+      ASR_BASE_URL: ${ASR_BASE_URL:-http://avastack-asr:8101}
+      TTS_BASE_URL: ${TTS_BASE_URL:-http://avastack-tts:8102}
+      AVATAR_BASE_URL: ${AVATAR_BASE_URL:-http://avastack-avatar:8103}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://avastack-llm:8104}
+      LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-ws://livekit:7880}
+      SRS_RTC_BASE_URL: ${SRS_RTC_BASE_URL:-http://srs:1985}
+    ports:
+      - "${ORCHESTRATOR_PORT:-8080}:8080"
+    depends_on:
+      - avastack-asr
+      - avastack-tts
+      - avastack-avatar
+      - avastack-llm
+
+  avastack-asr:
+    build:
+      context: ./services/model-asr-python
+    ports:
+      - "${ASR_PORT:-8101}:8101"
+
+  avastack-tts:
+    build:
+      context: ./services/model-tts-python
+    ports:
+      - "${TTS_PORT:-8102}:8102"
+
+  avastack-avatar:
+    build:
+      context: ./services/model-avatar-python
+    ports:
+      - "${AVATAR_PORT:-8103}:8103"
+
+  avastack-llm:
+    build:
+      context: ./services/model-llm-python
+    ports:
+      - "${LLM_PORT:-8104}:8104"
+
+  avastack-admin:
+    build:
+      context: ./services/admin-web
+    ports:
+      - "${ADMIN_PORT:-4173}:4173"
+    environment:
+      ORCHESTRATOR_BASE_URL: http://localhost:8080
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit/livekit.yaml
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+
+  srs:
+    image: ossrs/srs:6
+    command: ./objs/srs -c conf/srs.conf
+    volumes:
+      - ./infra/srs/srs.conf:/usr/local/srs/conf/srs.conf:ro
+    ports:
+      - "1935:1935"
+      - "1985:1985"
+      - "8081:8080"
