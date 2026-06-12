@@ -50,7 +50,10 @@ shared/
 1. 默认模式：`./start.ps1`
    - 先检测 `docker`
    - 不只检测 `docker` 命令，还会检测 Docker daemon 是否真的可连接
-   - 如果缺失，则优先尝试通过 `winget` 安装 `Rancher Desktop`
+   - 在开始安装容器运行时前，会先询问一次是否需要设置代理
+   - 如果缺失，则优先尝试直链下载 `Rancher Desktop` 的 MSI 并静默安装
+   - 脚本会输出自己的阶段进度，明确显示检测、下载、回退安装、等待 daemon 等状态
+   - 下载 `Rancher Desktop` 时会直接显示下载链接、真实下载进度和已下载大小
    - 如果 `Rancher Desktop` 安装失败，再回退尝试 `Docker Desktop`
    - 如果 `winget` 不可用或都失败，再回退到 `scoop install docker`
    - 如果检测到已安装 `Rancher Desktop` 或 `Docker Desktop` 但后台未启动，脚本会先尝试自动启动并等待初始化

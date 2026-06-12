@@ -6,6 +6,69 @@ param(
 $ErrorActionPreference = "Stop"
 $script:LastInstallError = ""
 $script:LastInstallTarget = ""
+$script:ProxyPrompted = $false
+$script:LastProgressRender = ""
+$script:LiveStatusLength = 0
+$script:InstallBlockedByElevation = $false
+
+function Update-StepProgress {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$Percent,
+        [Parameter(Mandatory = $true)]
+        [string]$Status,
+        [string]$Activity = "环境准备",
+        [string]$CurrentOperation = ""
+    )
+
+    $safePercent = [Math]::Max(0, [Math]::Min(100, $Percent))
+    $filledCount = [Math]::Floor($safePercent / 10)
+    $emptyCount = 10 - $filledCount
+    $bar = ("#" * $filledCount) + ("-" * $emptyCount)
+    $segments = @("[进度 $safePercent%]", "[$bar]", $Activity, $Status)
+    if (![string]::IsNullOrWhiteSpace($CurrentOperation)) {
+        $segments += $CurrentOperation
+    }
+    $line = ($segments -join " ")
+    if ($line -ne $script:LastProgressRender) {
+        Write-Host $line -ForegroundColor DarkCyan
+        $script:LastProgressRender = $line
+    }
+}
+
+function Complete-StepProgress {
+    param(
+        [string]$Activity = "环境准备"
+    )
+
+    if (![string]::IsNullOrWhiteSpace($script:LastProgressRender)) {
+        Write-Host "[进度 100%] [##########] $Activity 完成" -ForegroundColor DarkGreen
+        $script:LastProgressRender = ""
+    }
+}
+
+function Write-LiveStatusLine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Text,
+        [ConsoleColor]$ForegroundColor = [ConsoleColor]::Cyan
+    )
+
+    $padding = ""
+    if ($script:LiveStatusLength -gt $Text.Length) {
+        $padding = " " * ($script:LiveStatusLength - $Text.Length)
+    }
+
+    Write-Host ("`r" + $Text + $padding) -NoNewline -ForegroundColor $ForegroundColor
+    $script:LiveStatusLength = $Text.Length
+}
+
+function Complete-LiveStatusLine {
+    if ($script:LiveStatusLength -gt 0) {
+        Write-Host ""
+        $script:LiveStatusLength = 0
+    }
+}
 
 function Test-CommandExists {
     param(
@@ -45,6 +108,251 @@ function Set-LastInstallError {
 
 function Test-WingetExists {
     return Test-CommandExists "winget"
+}
+
+function Invoke-StreamingNativeCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [string[]]$Arguments = @()
+    )
+
+    $outputLines = New-Object System.Collections.Generic.List[string]
+    & $FilePath @Arguments 2>&1 | ForEach-Object {
+        $line = $_.ToString()
+        $outputLines.Add($line)
+        Write-Host $line
+    }
+
+    return @{
+        ExitCode = $LASTEXITCODE
+        Output = $outputLines.ToArray()
+    }
+}
+
+function Convert-SizeToMb {
+    param(
+        [Parameter(Mandatory = $true)]
+        [double]$Value,
+        [Parameter(Mandatory = $true)]
+        [string]$Unit
+    )
+
+    switch ($Unit) {
+        "KB" { return $Value / 1024.0 }
+        "MB" { return $Value }
+        "GB" { return $Value * 1024.0 }
+        default { return $Value }
+    }
+}
+
+function Get-RancherDesktopDownloadUrl {
+    return "https://github.com/rancher-sandbox/rancher-desktop/releases/download/v1.22.3/Rancher.Desktop.Setup.1.22.3.msi"
+}
+
+function Download-FileWithProgress {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationPath
+    )
+
+    $proxyUrl = Get-CurrentProxyUrl
+    $clientHandler = New-Object System.Net.Http.HttpClientHandler
+    if (![string]::IsNullOrWhiteSpace($proxyUrl)) {
+        $clientHandler.Proxy = New-Object System.Net.WebProxy($proxyUrl)
+        $clientHandler.UseProxy = $true
+    }
+
+    $client = New-Object System.Net.Http.HttpClient($clientHandler)
+    $client.Timeout = [TimeSpan]::FromHours(2)
+    $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Get, $Url)
+    $response = $client.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+    $response.EnsureSuccessStatusCode()
+
+    $totalBytes = $response.Content.Headers.ContentLength
+    $inputStream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+    $outputStream = [System.IO.File]::Open($DestinationPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    $buffer = New-Object byte[] (1024 * 256)
+    $readBytes = 0L
+    $lastBytes = 0L
+    $startTime = Get-Date
+    $lastSampleAt = $startTime
+
+    try {
+        while (($count = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $outputStream.Write($buffer, 0, $count)
+            $readBytes += $count
+
+            if ($totalBytes -gt 0) {
+                $ratio = [Math]::Min(1.0, $readBytes / $totalBytes)
+                $percent = 35 + [Math]::Floor($ratio * 35)
+                Update-StepProgress -Percent $percent -Activity "容器环境准备" -Status "正在下载安装包" -CurrentOperation "下载 Rancher Desktop 安装包"
+
+                $now = Get-Date
+                $deltaSeconds = ($now - $lastSampleAt).TotalSeconds
+                $speedText = ""
+                if ($deltaSeconds -gt 0.2) {
+                    $speedMbPerSec = [Math]::Max(0, (($readBytes - $lastBytes) / 1MB) / $deltaSeconds)
+                    if ($speedMbPerSec -gt 0) {
+                        $speedText = (" {0:N2} MB/s" -f $speedMbPerSec)
+                    }
+                    $lastSampleAt = $now
+                    $lastBytes = $readBytes
+                }
+
+                $barFilled = [Math]::Min(20, [Math]::Floor($ratio * 20))
+                $bar = ("#" * $barFilled) + ("-" * (20 - $barFilled))
+                $statusLine = "[下载 {0,3}%] [{1}] {2:N2} / {3:N2} MB{4}" -f ([Math]::Floor($ratio * 100)), $bar, ($readBytes / 1MB), ($totalBytes / 1MB), $speedText
+                Write-LiveStatusLine -Text $statusLine -ForegroundColor Cyan
+            } else {
+                Write-LiveStatusLine -Text ("[下载中] 已下载 {0:N2} MB" -f ($readBytes / 1MB)) -ForegroundColor Cyan
+            }
+        }
+    } finally {
+        Complete-LiveStatusLine
+        $outputStream.Dispose()
+        $inputStream.Dispose()
+        $response.Dispose()
+        $client.Dispose()
+        $clientHandler.Dispose()
+    }
+
+    return Test-Path $DestinationPath
+}
+
+function Install-RancherDesktopDirect {
+    $downloadUrl = Get-RancherDesktopDownloadUrl
+    $downloadDir = Join-Path $env:TEMP "AvaStackDownloads"
+    if (!(Test-Path $downloadDir)) {
+        New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+    }
+
+    $msiPath = Join-Path $downloadDir "Rancher.Desktop.Setup.1.22.3.msi"
+    Set-LastInstallError -Target "SUSE.RancherDesktop" -Message ""
+    $script:InstallBlockedByElevation = $false
+
+    Write-Host "下载链接：$downloadUrl" -ForegroundColor DarkCyan
+    try {
+        $downloaded = Download-FileWithProgress -Url $downloadUrl -DestinationPath $msiPath
+        if (-not $downloaded) {
+            Set-LastInstallError -Target "SUSE.RancherDesktop" -Message "Rancher Desktop 安装包下载未完成。"
+            return $false
+        }
+
+        Update-StepProgress -Percent 72 -Activity "容器环境准备" -Status "安装 Rancher Desktop" -CurrentOperation $msiPath
+        Write-Host "下载完成，开始静默安装 Rancher Desktop..." -ForegroundColor Yellow
+        $msiArguments = @("/i", "`"$msiPath`"", "/quiet", "/norestart")
+        $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArguments -Wait -PassThru
+        if ($process.ExitCode -eq 0) {
+            return $true
+        }
+
+        $msiLogs = Get-ChildItem $env:TEMP -Filter "MSI*.LOG" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
+        $latestMsiLog = $msiLogs | Select-Object -First 1
+        if ($null -ne $latestMsiLog) {
+            $msiLogContent = Get-Content $latestMsiLog.FullName -ErrorAction SilentlyContinue | Out-String
+            if ($msiLogContent -match 'Error 1925') {
+                $script:InstallBlockedByElevation = $true
+                Set-LastInstallError -Target "SUSE.RancherDesktop" -Message ("Rancher Desktop 安装需要管理员权限。MSI 日志：{0}" -f $latestMsiLog.FullName)
+                return $false
+            }
+        }
+
+        Set-LastInstallError -Target "SUSE.RancherDesktop" -Message ("msiexec 安装失败，退出码：{0}" -f $process.ExitCode)
+        return $false
+    } catch {
+        Set-LastInstallError -Target "SUSE.RancherDesktop" -Message $_.Exception.Message
+        return $false
+    }
+}
+
+function Invoke-WingetInstallWithLiveProgress {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PackageId
+    )
+
+    $outputLines = New-Object System.Collections.Generic.List[string]
+    $downloadUrl = $null
+    $downloadStartAt = $null
+    $lastDownloadedMb = $null
+    $lastSampleAt = $null
+
+    try {
+        & winget install --id $PackageId --source winget --accept-source-agreements --accept-package-agreements 2>&1 | ForEach-Object {
+            $line = $_.ToString()
+            $outputLines.Add($line)
+
+            $downloadUrlMatch = [regex]::Match($line, 'https?://\S+')
+            if ($downloadUrlMatch.Success -and [string]::IsNullOrWhiteSpace($downloadUrl)) {
+                $downloadUrl = $downloadUrlMatch.Value
+                Complete-LiveStatusLine
+                Write-Host "下载链接：$downloadUrl" -ForegroundColor DarkCyan
+            }
+
+            $progressMatch = [regex]::Match($line, '([0-9]+(?:\.[0-9]+)?)\s*(KB|MB|GB)\s*/\s*([0-9]+(?:\.[0-9]+)?)\s*(KB|MB|GB)')
+            if ($progressMatch.Success) {
+                if ($null -eq $downloadStartAt) {
+                    $downloadStartAt = Get-Date
+                    $lastSampleAt = $downloadStartAt
+                }
+
+                $downloadedValue = [double]$progressMatch.Groups[1].Value
+                $downloadedUnit = $progressMatch.Groups[2].Value
+                $totalValue = [double]$progressMatch.Groups[3].Value
+                $totalUnit = $progressMatch.Groups[4].Value
+                $downloadedMb = Convert-SizeToMb -Value $downloadedValue -Unit $downloadedUnit
+                $totalMb = Convert-SizeToMb -Value $totalValue -Unit $totalUnit
+
+                if ($totalMb -gt 0) {
+                    $ratio = [Math]::Min(1.0, $downloadedMb / $totalMb)
+                    $percent = 35 + [Math]::Floor($ratio * 35)
+                    Update-StepProgress -Percent $percent -Activity "容器环境准备" -Status "正在下载安装包" -CurrentOperation ("winget install $PackageId")
+
+                    $now = Get-Date
+                    $speedText = ""
+                    if ($null -ne $lastDownloadedMb -and $null -ne $lastSampleAt) {
+                        $deltaSeconds = ($now - $lastSampleAt).TotalSeconds
+                        if ($deltaSeconds -gt 0.5) {
+                            $speedMbPerSec = [Math]::Max(0, ($downloadedMb - $lastDownloadedMb) / $deltaSeconds)
+                            if ($speedMbPerSec -gt 0) {
+                                $speedText = (" {0:N2} MB/s" -f $speedMbPerSec)
+                            }
+                        }
+                    }
+
+                    $barFilled = [Math]::Min(20, [Math]::Floor($ratio * 20))
+                    $bar = ("#" * $barFilled) + ("-" * (20 - $barFilled))
+                    $statusLine = "[下载 {0,3}%] [{1}] {2:N2} / {3:N2} MB{4}" -f ([Math]::Floor($ratio * 100)), $bar, $downloadedMb, $totalMb, $speedText
+                    Write-LiveStatusLine -Text $statusLine -ForegroundColor Cyan
+
+                    $lastDownloadedMb = $downloadedMb
+                    $lastSampleAt = $now
+                }
+                return
+            }
+
+            if ($line -match '正在下载\s+https?://') {
+                return
+            }
+
+            if ($line -match '已找到 ' -or $line -match '此包需要以下依赖项' -or $line -match 'Microsoft\.WSL') {
+                return
+            }
+
+            return
+        }
+    } finally {
+        Complete-LiveStatusLine
+    }
+
+    return @{
+        ExitCode = $LASTEXITCODE
+        Output = $outputLines.ToArray()
+        DownloadUrl = $downloadUrl
+    }
 }
 
 function Try-InstallScoop {
@@ -101,11 +409,10 @@ function Try-InstallWithScoop {
 
     Write-Host "检测到缺少 $PackageName，尝试通过 scoop 安装..."
     try {
-        $output = & scoop install $PackageName 2>&1
-        $exitCode = $LASTEXITCODE
-        if ($output) {
-            $output | ForEach-Object { Write-Host $_ }
-        }
+        Update-StepProgress -Percent 92 -Activity "容器环境准备" -Status "回退安装 docker CLI" -CurrentOperation "scoop install $PackageName"
+        $result = Invoke-StreamingNativeCommand -FilePath "scoop" -Arguments @("install", $PackageName)
+        $output = $result.Output
+        $exitCode = $result.ExitCode
         if ($exitCode -eq 0) {
             return $true
         }
@@ -132,11 +439,10 @@ function Try-InstallWithWinget {
 
     Write-Host "尝试通过 winget 安装 $PackageId ..."
     try {
-        $output = & winget install --id $PackageId --source winget --accept-source-agreements --accept-package-agreements 2>&1
-        $exitCode = $LASTEXITCODE
-        if ($output) {
-            $output | ForEach-Object { Write-Host $_ }
-        }
+        Update-StepProgress -Percent 35 -Activity "容器环境准备" -Status "正在下载安装包" -CurrentOperation "winget install $PackageId"
+        $result = Invoke-WingetInstallWithLiveProgress -PackageId $PackageId
+        $output = $result.Output
+        $exitCode = $result.ExitCode
         if ($exitCode -eq 0) {
             return $true
         }
@@ -195,19 +501,30 @@ function Get-RdctlExePath {
 
 function Try-InstallDocker {
     Set-LastInstallError -Target "container_runtime" -Message ""
+    $script:InstallBlockedByElevation = $false
 
+    Update-StepProgress -Percent 25 -Activity "容器环境准备" -Status "开始安装容器运行时" -CurrentOperation "优先尝试 Rancher Desktop"
     Write-Host "优先尝试安装 Rancher Desktop..." -ForegroundColor Yellow
-    $wingetInstalled = Try-InstallWithWinget "SUSE.RancherDesktop"
-    if ($wingetInstalled) {
+    $rancherInstalled = Install-RancherDesktopDirect
+    if ($rancherInstalled) {
+        Update-StepProgress -Percent 70 -Activity "容器环境准备" -Status "Rancher Desktop 安装完成"
         return $true
     }
 
+    if ($script:InstallBlockedByElevation) {
+        Write-Host "Rancher Desktop 下载完成，但安装阶段需要管理员权限；停止自动回退。" -ForegroundColor Yellow
+        return $false
+    }
+
+    Update-StepProgress -Percent 75 -Activity "容器环境准备" -Status "Rancher Desktop 安装失败" -CurrentOperation "回退尝试 Docker Desktop"
     Write-Host "winget 安装 Rancher Desktop 未成功，回退尝试安装 Docker Desktop..." -ForegroundColor Yellow
     $wingetInstalled = Try-InstallWithWinget "Docker.DockerDesktop"
     if ($wingetInstalled) {
+        Update-StepProgress -Percent 85 -Activity "容器环境准备" -Status "Docker Desktop 安装完成"
         return $true
     }
 
+    Update-StepProgress -Percent 90 -Activity "容器环境准备" -Status "Docker Desktop 安装失败" -CurrentOperation "最后回退到 scoop"
     Write-Host "winget 安装 Docker Desktop 也未成功，最后回退到 scoop 安装 docker CLI..." -ForegroundColor Yellow
     return Try-InstallWithScoop "docker"
 }
@@ -266,8 +583,12 @@ function Wait-DockerDaemonReady {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
         if (Test-DockerDaemonReady) {
+            Update-StepProgress -Percent 100 -Activity "容器环境准备" -Status "docker daemon 已就绪"
             return $true
         }
+        $elapsedSeconds = [int](((Get-Date) - $deadline.AddSeconds(-$TimeoutSeconds)).TotalSeconds)
+        $progressPercent = 95 + [Math]::Floor(($elapsedSeconds / [Math]::Max($TimeoutSeconds, 1)) * 4)
+        Update-StepProgress -Percent $progressPercent -Activity "容器环境准备" -Status "等待 docker daemon 就绪" -CurrentOperation ("已等待 {0}/{1} 秒" -f $elapsedSeconds, $TimeoutSeconds)
         Start-Sleep -Seconds 3
     }
 
@@ -324,8 +645,63 @@ function Set-ProxyEnv {
 
     $env:HTTP_PROXY = $ProxyUrl
     $env:HTTPS_PROXY = $ProxyUrl
+    $env:ALL_PROXY = $ProxyUrl
     $env:http_proxy = $ProxyUrl
     $env:https_proxy = $ProxyUrl
+    $env:all_proxy = $ProxyUrl
+}
+
+function Get-CurrentProxyUrl {
+    $candidates = @(
+        $env:HTTPS_PROXY,
+        $env:HTTP_PROXY,
+        $env:ALL_PROXY,
+        $env:https_proxy,
+        $env:http_proxy,
+        $env:all_proxy
+    )
+
+    foreach ($candidate in $candidates) {
+        if (![string]::IsNullOrWhiteSpace($candidate)) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Prompt-ProxyBeforeDockerInstall {
+    if ($script:ProxyPrompted) {
+        return $false
+    }
+
+    $script:ProxyPrompted = $true
+    $existingProxy = Get-CurrentProxyUrl
+
+    Write-Host ""
+    Write-Host "即将开始下载安装容器运行时。" -ForegroundColor Yellow
+    Write-Host "Rancher Desktop 安装包较大，下载源通常包含 GitHub release。" -ForegroundColor Yellow
+
+    if (![string]::IsNullOrWhiteSpace($existingProxy)) {
+        Write-Host "检测到当前会话已存在代理环境变量：$existingProxy" -ForegroundColor Green
+        Write-Host "脚本将直接沿用该代理继续安装。" -ForegroundColor Green
+        return $true
+    }
+
+    Write-Host "如果你访问 GitHub / winget 源较慢，建议现在先填写代理。" -ForegroundColor Yellow
+    Write-Host "代理格式示例：" -ForegroundColor Yellow
+    Write-Host "   http://127.0.0.1:7890" -ForegroundColor Cyan
+    Write-Host "   http://user:pass@host:port" -ForegroundColor Cyan
+
+    $proxy = Read-Host "请输入代理地址（直接回车表示先不设置）"
+    if (![string]::IsNullOrWhiteSpace($proxy)) {
+        Set-ProxyEnv -ProxyUrl $proxy
+        Write-Host "已设置当前进程代理环境变量，准备开始安装..." -ForegroundColor Green
+        return $true
+    }
+
+    Write-Host "未设置代理，先按直连继续。" -ForegroundColor Yellow
+    return $false
 }
 
 function Prompt-ProxyIfNeeded {
@@ -357,6 +733,18 @@ function Show-DockerInstallGuide {
     Write-Host ""
     Write-Host "安装完成后重新运行：" -ForegroundColor Yellow
     Write-Host "   ./start.ps1" -ForegroundColor Cyan
+}
+
+function Show-AdminInstallGuide {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InstallerPath
+    )
+
+    Write-Host ""
+    Write-Host "安装包已下载完成，但当前安装步骤需要管理员权限。" -ForegroundColor Yellow
+    Write-Host "请用管理员权限执行下面命令后，再重新运行脚本：" -ForegroundColor Yellow
+    Write-Host ("   msiexec /i `"{0}`" /quiet /norestart" -f $InstallerPath) -ForegroundColor Cyan
 }
 
 function Show-RancherDesktopStartGuide {
@@ -653,6 +1041,7 @@ if ($Mode -eq "local") {
 }
 
 Write-Host "检测正式骨架模式依赖..."
+Update-StepProgress -Percent 5 -Activity "容器环境准备" -Status "检测 docker 依赖"
 $dockerResult = Test-DockerModePrerequisites
 $dockerMissing = $dockerResult.missing
 
@@ -660,15 +1049,22 @@ if ($dockerMissing.Count -gt 0) {
     Show-DockerMissingSummary -Missing $dockerMissing
     if ($dockerMissing -contains "docker") {
         Write-Host "开始统一安装缺少的 docker..." -ForegroundColor Yellow
+        Prompt-ProxyBeforeDockerInstall | Out-Null
+        Update-StepProgress -Percent 15 -Activity "容器环境准备" -Status "准备安装容器运行时"
         $installed = Try-InstallDocker
         if (-not $installed) {
             $retryWithProxy = Prompt-ProxyIfNeeded
             if ($retryWithProxy) {
                 Write-Host "代理已设置，重新安装 docker..." -ForegroundColor Green
+                Update-StepProgress -Percent 20 -Activity "容器环境准备" -Status "已更新代理，重新安装容器运行时"
                 $installed = Try-InstallDocker
             }
         }
         if (-not $installed) {
+            if ($script:InstallBlockedByElevation) {
+                Show-AdminInstallGuide -InstallerPath (Join-Path $env:TEMP "AvaStackDownloads\Rancher.Desktop.Setup.1.22.3.msi")
+            }
+            Complete-StepProgress -Activity "容器环境准备"
             Show-DockerInstallGuide
             exit 1
         }
@@ -683,6 +1079,7 @@ if (-not $dockerResult.dockerReady) {
             $started = Try-StartRancherDesktop
             if ($started) {
                 Write-Host "等待 Rancher Desktop 初始化..." -ForegroundColor Yellow
+                Update-StepProgress -Percent 95 -Activity "容器环境准备" -Status "等待 Rancher Desktop 初始化"
                 if (Wait-DockerDaemonReady -TimeoutSeconds 90) {
                     $dockerResult = Test-DockerModePrerequisites
                 }
@@ -693,6 +1090,7 @@ if (-not $dockerResult.dockerReady) {
             $started = Try-StartDockerDesktop
             if ($started) {
                 Write-Host "等待 Docker Desktop 初始化..." -ForegroundColor Yellow
+                Update-StepProgress -Percent 95 -Activity "容器环境准备" -Status "等待 Docker Desktop 初始化"
                 if (Wait-DockerDaemonReady -TimeoutSeconds 90) {
                     $dockerResult = Test-DockerModePrerequisites
                 }
@@ -713,15 +1111,19 @@ if (-not $dockerResult.dockerReady) {
                 Write-Host "最近一次自动启动容器运行时的错误：" -ForegroundColor Yellow
                 Write-Host $script:LastInstallError -ForegroundColor DarkYellow
             }
+            Complete-StepProgress -Activity "容器环境准备"
             exit 1
         }
     }
 
     if (-not $dockerResult.dockerReady) {
+        Complete-StepProgress -Activity "容器环境准备"
         Show-DockerInstallGuide
         exit 1
     }
 }
 
+Update-StepProgress -Percent 100 -Activity "容器环境准备" -Status "docker 环境已就绪"
+Complete-StepProgress -Activity "容器环境准备"
 Write-Host "检测到可用的 docker，进入正式骨架模式..."
 docker compose up --build
