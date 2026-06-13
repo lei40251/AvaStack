@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AvaStack 学习路线图</title>
+  <style>
+    :root {
+      --bg: #f5efe3;
+      --paper: #fffdf8;
+      --ink: #1f1a17;
+      --muted: #6b625c;
+      --line: #d8cbbb;
+      --accent: #b6482c;
+      --accent-soft: #f2d9cd;
+      --accent-2: #2f5d50;
+      --accent-2-soft: #dbe8e2;
+      --accent-3: #8b6f3d;
+      --shadow: 0 14px 40px rgba(56, 39, 21, 0.08);
+      --radius: 18px;
+      --mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, #f1ddca 0, transparent 26%),
+        radial-gradient(circle at left 20%, #efe5d5 0, transparent 24%),
+        var(--bg);
+      line-height: 1.75;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.94em;
+      background: #f1eadf;
+      border: 1px solid #e5d8c7;
+      border-radius: 8px;
+      padding: 0.08rem 0.4rem;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 24px;
+      background: rgba(255, 252, 246, 0.9);
+      border-bottom: 1px solid rgba(120, 98, 77, 0.14);
+      backdrop-filter: blur(10px);
+    }
+
+    .brand {
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .brand span { color: var(--accent); }
+
+    .topnav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 0.92rem;
+    }
+
+    .topnav a { color: var(--muted); }
+
+    .hero {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 54px 24px 28px;
+      display: grid;
+      grid-template-columns: 1.3fr 0.9fr;
+      gap: 22px;
+    }
+
+    .hero-main,
+    .hero-side,
+    .card,
+    .phase {
+      background: var(--paper);
+      border: 1px solid rgba(129, 104, 79, 0.16);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-main {
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-main::after {
+      content: "";
+      position: absolute;
+      right: -40px;
+      top: -40px;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(182, 72, 44, 0.14), transparent 66%);
+    }
+
+    .eyebrow {
+      display: inline-block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(2rem, 4vw, 3.3rem);
+      line-height: 1.12;
+    }
+
+    .lead {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 52ch;
+      margin: 0 0 20px;
+    }
+
+    .hero-points {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .hero-points li {
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #faf5ec;
+      border: 1px solid #eadfce;
+    }
+
+    .hero-side {
+      padding: 24px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .mini-card {
+      border-radius: 14px;
+      padding: 16px;
+      background: linear-gradient(180deg, #fffaf2 0%, #f7f1e7 100%);
+      border: 1px solid #eadcc8;
+    }
+
+    .mini-card h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .mini-card p {
+      margin: 0;
+      font-size: 0.94rem;
+      color: var(--muted);
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px 64px;
+    }
+
+    .section-head {
+      margin: 28px 0 18px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 1.65rem;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 60ch;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .card {
+      padding: 24px;
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+    }
+
+    .tech-list,
+    .plain-list,
+    .check-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .tech-list li,
+    .plain-list li,
+    .check-list li {
+      margin-bottom: 8px;
+    }
+
+    .phase-list {
+      display: grid;
+      gap: 18px;
+      margin-top: 16px;
+    }
+
+    .phase {
+      padding: 26px;
+    }
+
+    .phase-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .phase-no {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1rem;
+      color: white;
+      background: var(--accent);
+      box-shadow: inset 0 -8px 18px rgba(0, 0, 0, 0.14);
+    }
+
+    .phase-top h3 {
+      margin: 0;
+      font-size: 1.28rem;
+    }
+
+    .phase-goal {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 0.92rem;
+      background: #f7efe5;
+      border: 1px solid #eadcc8;
+      padding: 6px 12px;
+      border-radius: 999px;
+    }
+
+    .phase p {
+      margin: 0 0 14px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .pill {
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: var(--accent-2);
+      background: var(--accent-2-soft);
+      border-radius: 999px;
+      padding: 6px 11px;
+    }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .step-card {
+      padding: 16px;
+      border-radius: 14px;
+      background: #fcf8f1;
+      border: 1px solid #eadfce;
+    }
+
+    .step-card h4 {
+      margin: 0 0 8px;
+      font-size: 0.98rem;
+      color: var(--accent);
+    }
+
+    .step-card p,
+    .step-card li {
+      margin: 0;
+      font-size: 0.93rem;
+      color: var(--muted);
+    }
+
+    .step-card ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }
+
+    .practice {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #fff6f1 0%, #fdf0e8 100%);
+      border: 1px solid #f0d7c8;
+    }
+
+    .practice strong {
+      color: var(--accent);
+    }
+
+    .resource-box {
+      margin-top: 14px;
+      padding: 16px 18px;
+      border-radius: 14px;
+      background: #f8f6ef;
+      border: 1px solid #e8dfd0;
+    }
+
+    .resource-box h4 {
+      margin: 0 0 8px;
+      font-size: 0.98rem;
+    }
+
+    .resource-box ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .resource-box li {
+      margin-bottom: 8px;
+      color: var(--muted);
+    }
+
+    .dos-donts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .dos,
+    .donts {
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    .dos {
+      background: #f2f7f4;
+      border: 1px solid #d3e2d9;
+    }
+
+    .donts {
+      background: #fcf1ed;
+      border: 1px solid #f0d2c7;
+    }
+
+    .dos h4,
+    .donts h4 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .timeline-item {
+      padding: 16px 18px;
+      border-radius: 14px;
+      border: 1px solid #eadcc8;
+      background: #fffaf3;
+    }
+
+    .timeline-item h4 {
+      margin: 0 0 6px;
+      color: var(--accent-3);
+      font-size: 1rem;
+    }
+
+    .footer {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px 52px;
+    }
+
+    .footer-note {
+      padding: 22px 24px;
+      border-radius: 18px;
+      background: #1f1a17;
+      color: #f9efe4;
+      box-shadow: var(--shadow);
+    }
+
+    .footer-note p {
+      margin: 0;
+      color: #e8d9ca;
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .grid-2,
+      .step-grid,
+      .dos-donts {
+        grid-template-columns: 1fr;
+      }
+
+      .phase-goal {
+        margin-left: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        padding: 12px 16px;
+      }
+
+      .hero {
+        padding: 36px 16px 18px;
+      }
+
+      .wrap,
+      .footer {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .hero-main,
+      .hero-side,
+      .card,
+      .phase {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">Ava<span>Stack</span> 学习路线</div>
+    <nav class="topnav">
+      <a href="#overview">总览</a>
+      <a href="#phase0">先跑起来</a>
+      <a href="#phase2">Python</a>
+      <a href="#phase5">前端</a>
+      <a href="#lang">语言学习</a>
+    </nav>
+  </div>
+
+  <header class="hero">
+    <section class="hero-main">
+      <div class="eyebrow">面向零基础 / 转行同学</div>
+      <h1>AvaStack 实操型学习路线图</h1>
+      <p class="lead">这份路线图的目标不是让你一下子学完所有技术，而是先把项目跑起来、看懂骨架、敢改小功能，再逐步具备继续推进这个仓库的能力。</p>
+      <ul class="hero-points">
+        <li>你可以先不会语言，也能先把项目跑起来。</li>
+        <li>你不用先学完整门语言，再回来看项目。</li>
+        <li>最好的学习方式是：看一点教程，立刻回仓库验证。</li>
+      </ul>
+    </section>
+    <aside class="hero-side">
+      <div class="mini-card">
+        <h3>这份路线能帮你做到什么</h3>
+        <p>把当前骨架项目跑起来，看懂服务职责，追一条请求链路，修改 stub 返回值，完成简单前端展示改动。</p>
+      </div>
+      <div class="mini-card">
+        <h3>暂时不要给自己的目标</h3>
+        <p>不是“立刻独立做完整数字人产品”，而是“先搞懂骨架、跑通流程、能做小改动”。</p>
+      </div>
+      <div class="mini-card">
+        <h3>最重要的学习节奏</h3>
+        <p>每次只学一个很小主题，最多 20 到 40 分钟，然后马上回项目里找对应代码。</p>
+      </div>
+    </aside>
+  </header>
+
+  <main class="wrap">
+    <section id="overview">
+      <div class="section-head">
+        <h2>项目技术全景</h2>
+        <p>先知道项目里分别是谁在负责什么，再决定从哪里开始学。</p>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <h3>你会碰到的主要技术</h3>
+          <ul class="tech-list">
+            <li><strong>Python + FastAPI：</strong> 四个模型服务的接口骨架。</li>
+            <li><strong>Go：</strong> 编排层，负责控制面、会话和健康聚合。</li>
+            <li><strong>TypeScript + Vite：</strong> 管理后台页面。</li>
+            <li><strong>Docker Compose：</strong> 本地把一组服务一起拉起来。</li>
+            <li><strong>LiveKit / SRS：</strong> 后续实时音视频和分发能力。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>建议的学习顺序</h3>
+          <ol class="plain-list">
+            <li>先把项目跑起来。</li>
+            <li>再看架构、服务边界和共享契约。</li>
+            <li>先读最简单的 Python 服务。</li>
+            <li>再看前端。</li>
+            <li>最后再进入 Go、LiveKit 和真实模型。</li>
+          </ol>
+        </article>
+      </div>
+    </section>
+
+    <section id="phase0">
+      <div class="section-head">
+        <h2>阶段 0：先把项目跑起来</h2>
+        <p>很多小白卡住，不是因为不会写代码，而是因为项目从来没真正“活起来”。</p>
+      </div>
+      <div class="phase-list">
+        <article class="phase">
+          <div class="phase-top">
+            <div class="phase-no">0</div>
+            <h3>目标：先看到系统在运行</h3>
+            <div class="phase-goal">先跑，不先啃语法</div>
+          </div>
+          <p>这一阶段只解决一件事：你能不能把项目拉起来，并知道它现在大概有哪几个入口。</p>
+          <div class="pill-row">
+            <span class="pill">README</span>
+            <span class="pill">start.ps1</span>
+            <span class="pill">compose.yaml</span>
+            <span class="pill">HTTP 接口验证</span>
+          </div>
+          <div class="step-grid">
+            <div class="step-card">
+              <h4>先看哪里</h4>
+              <ul>
+                <li><a href="/E:/GitHub/AvaStack/README.md:36">README.md</a></li>
+                <li><a href="https://docs.docker.com/get-started/" target="_blank" rel="noopener">Docker Get started</a></li>
+                <li><a href="https://docs.docker.com/compose/gettingstarted/" target="_blank" rel="noopener">Compose Quickstart</a></li>
+              </ul>
+            </div>
+            <div class="step-card">
+              <h4>只看什么</h4>
+              <ul>
+                <li>什么是镜像</li>
+                <li>什么是容器</li>
+                <li>什么是端口映射</li>
+                <li>一个 <code>compose.yaml</code> 可以起多个服务</li>
+              </ul>
+            </div>
+            <div class="step-card">
+              <h4>看完立刻做什么</h4>
+              <ul>
+                <li>打开 <a href="/E:/GitHub/AvaStack/compose.yaml:1">compose.yaml</a></li>
+                <li>找出哪个服务暴露 <code>8080</code></li>
+                <li>找出哪个服务对应管理台</li>
+                <li>运行 <code>./start.ps1</code></li>
+              </ul>
+            </div>
+          </div>
+          <div class="practice">
+            <strong>实践任务：</strong>启动完成后，访问 <code>http://localhost:8080/healthz</code>、<code>/v1/info</code>、<code>/v1/sessions</code>，再执行一次 <code>POST /v1/sessions</code>。
+          </div>
+          <div class="dos-donts">
+            <div class="dos">
+              <h4>这一阶段应该做</h4>
+              <ul class="check-list">
+                <li>先确认项目能启动。</li>
+                <li>先访问接口，看返回是什么。</li>
+                <li>先知道系统有哪些服务。</li>
+              </ul>
+            </div>
+            <div class="donts">
+              <h4>这一阶段不要做</h4>
+              <ul class="check-list">
+                <li>不要现在去学写 Dockerfile。</li>
+                <li>不要现在去背 Compose 全部语法。</li>
+                <li>不要现在碰 Kubernetes。</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="phase1">
+      <div class="section-head">
+        <h2>阶段 1：看懂架构和服务边界</h2>
+        <p>先知道“谁负责什么”，后面读代码就不会一直迷路。</p>
+      </div>
+      <div class="phase-list">
+        <article class="phase">
+          <div class="phase-top">
+            <div class="phase-no">1</div>
+            <h3>目标：知道项目为什么这样拆</h3>
+            <div class="phase-goal">理解骨架，不求细节</div>
+          </div>
+          <p>当前仓库是服务化骨架，不是完整产品。先把这个定位认清，学习会轻松很多。</p>
+          <div class="resource-box">
+            <h4>先读这 3 份文档</h4>
+            <ul>
+              <li><a href="/E:/GitHub/AvaStack/docs/architecture.md:1">docs/architecture.md</a></li>
+              <li><a href="/E:/GitHub/AvaStack/docs/service-decomposition.md:1">docs/service-decomposition.md</a></li>
+              <li><a href="/E:/GitHub/AvaStack/shared/contracts/README.md:1">shared/contracts/README.md</a></li>
+            </ul>
+          </div>
+          <div class="practice">
+            <strong>实践任务：</strong>用自己的话回答两个问题：为什么以后把 LLM 后端从 stub 换成 vLLM，不需要重写整个项目？为什么 orchestrator 不直接写死 ASR、TTS、LLM、Avatar 的全部逻辑？
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="phase2">
+      <div class="section-head">
+        <h2>阶段 2：先学最容易上手的 Python 服务</h2>
+        <p>为了看懂项目，只补最少的 Python。不要等“学完 Python”才回来。</p>
+      </div>
+      <div class="phase-list">
+        <article class="phase">
+          <div class="phase-top">
+            <div class="phase-no">2</div>
+            <h3>目标：看懂一个 FastAPI 服务长什么样</h3>
+            <div class="phase-goal">先读、先改、先验证</div>
+          </div>
+          <p>建议先看 <code>model-asr-python</code>、<code>model-tts-python</code>，再看 <code>model-llm-python</code>，最后看 <code>model-avatar-python</code>。</p>
+          <div class="step-grid">
+            <div class="step-card">
+              <h4>第一天这一轮</h4>
+              <ul>
+                <li>看 <a href="https://docs.python.org/zh-cn/3/tutorial/" target="_blank" rel="noopener">Python 官方教程</a></li>
+                <li>只看变量、<code>if</code>、函数、列表、字典</li>
+                <li>回到 <a href="/E:/GitHub/AvaStack/services/model-asr-python/app/main.py:1">model-asr-python/app/main.py</a></li>
+                <li>只找 <code>app = FastAPI(...)</code>、<code>@app.get("/healthz")</code>、<code>return {...}</code></li>
+              </ul>
+            </div>
+            <div class="step-card">
+              <h4>第二天这一轮</h4>
+              <ul>
+                <li>看 <a href="https://fastapi.tiangolo.com/zh/" target="_blank" rel="noopener">FastAPI 官方教程</a></li>
+                <li>只看 First Steps、Path Operation、Request Body</li>
+                <li>回到 <a href="/E:/GitHub/AvaStack/services/model-llm-python/app/main.py:1">model-llm-python/app/main.py</a></li>
+                <li>只找 <code>ChatRequest</code>、<code>@app.post("/v1/chat")</code>、<code>payload.message</code></li>
+              </ul>
+            </div>
+            <div class="step-card">
+              <h4>第三天这一轮</h4>
+              <ul>
+                <li>如果还不理解 <code>BaseModel</code>，再看 <a href="https://pydantic.dev/docs/validation/latest/get-started/" target="_blank" rel="noopener">Pydantic Get Started</a></li>
+                <li>把 <code>stub response</code> 改成你自己的文本</li>
+                <li>重启服务</li>
+                <li>验证接口返回有没有变化</li>
+              </ul>
+            </div>
+          </div>
+          <div class="practice">
+            <strong>实践任务：</strong>当前仓库里不是 <code>/v1/chat/completions</code>，而是 <code>POST /v1/chat</code>。你要能自己在代码里找到它，并说清楚它收什么、返回什么。
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="phase3">
+      <div class="section-head">
+        <h2>阶段 3：理解共享契约和会话模型</h2>
+        <p>服务不是随便返回 JSON 的。你后面改 Go、改 Python、改前端，都离不开这套结构。</p>
+      </div>
+      <div class="phase-list">
+        <article class="phase">
+          <div class="phase-top">
+            <div class="phase-no">3</div>
+            <h3>目标：知道接口外层结构为什么要统一</h3>
+            <div class="phase-goal">抓住 request_id / session_id / status / data / meta</div>
+          </div>
+          <div class="resource-box">
+            <h4>重点看</h4>
+            <ul>
+              <li><a href="/E:/GitHub/AvaStack/shared/contracts/README.md:11">通用响应包裹</a></li>
+              <li><a href="/E:/GitHub/AvaStack/shared/contracts/README.md:37">错误响应约定</a></li>
+              <li><a href="/E:/GitHub/AvaStack/shared/contracts/README.md:63">Session Schema</a></li>
+              <li><a href="/E:/GitHub/AvaStack/shared/contracts/README.md:89">会话创建与更新请求</a></li>
+            </ul>
+          </div>
+          <div class="practice">
+            <strong>实践任务：</strong>先创建一个会话，再调 <code>GET /v1/sessions</code>，然后对照契约文档，把返回字段一一对应上。
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="phase4">
+      <div class="section-head">
+        <h2>阶段 4：进入 Go 编排层</h2>
+        <p>这里是项目的“大脑”，但你不需要先把 Go 学完整，再来看它。</p>
+      </div>
+      <div class="phase-list">
+        <article class="phase">
+          <div class="phase-top">
+            <div class="phase-no">4</div>
+            <h3>目标：能追一条控制面请求链路</h3>
+            <div class="phase-goal">从接口路径追到处理函数</div>
+          </div>
+          <div class="step-grid">
+            <div class="step-card">
+              <h4>先看哪里</h4>
+              <ul>
+                <li><a href="https://go.dev/doc/tutorial/getting-started" target="_blank" rel="noopener">Get started with Go</a></li>
+                <li><a href="https://go.dev/tour/" target="_blank" rel="noopener">A Tour of Go</a></li>
+                <li><a href="/E:/GitHub/AvaStack/services/orchestrator-go/internal/httpapi/router.go:1">router.go</a></li>
+              </ul>
+            </div>
+            <div class="step-card">
+              <h4>只学最小知识</h4>
+              <ul>
+                <li><code>func</code></li>
+                <li><code>struct</code></li>
+                <li><code>map</code></li>
+                <li><code>if err != nil</code></li>
+                <li><code>func (r *Router)</code></li>
+              </ul>
+            </div>
+            <div class="step-card">
+              <h4>回仓库先看什么</h4>
+              <ul>
+                <li><a href="/E:/GitHub/AvaStack/services/orchestrator-go/cmd/api/main.go:1">cmd/api/main.go</a></li>
+                <li><a href="/E:/GitHub/AvaStack/services/orchestrator-go/internal/httpapi/router.go:34">路由注册</a></li>
+                <li><a href="/E:/GitHub/AvaStack/services/orchestrator-go/internal/controlplane/store.go:1">SessionStore</a></li>
+              </ul>
+            </div>
+          </div>
+          <div class="practice">
+            <strong>实践任务：</strong>找到 <code>POST /v1/sessions</code> 对应的函数，画出它从路由到会话创建再到响应返回的最短调用链。
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="phase5">
+      <div class="section-head">
+        <h2>阶段 5：理解管理后台前端</h2>
+        <p>前端是最容易做出可见改动的地方，很适合建立“我真的能改动项目”的感觉。</p>
+      </div>
+      <div class="phase-list">
+        <article class="phase">
+          <div class="phase-top">
+            <div class="phase-no">5</div>
+            <h3>目标：看懂页面怎么拿数据、怎么显示数据</h3>
+            <div class="phase-goal">不先学框架，先学原生 TS</div>
+          </div>
+          <div class="step-grid">
+            <div class="step-card">
+              <h4>第一天这一轮</h4>
+              <ul>
+                <li>看 <a href="https://www.typescriptlang.org/docs/handbook/intro.html" target="_blank" rel="noopener">TypeScript Handbook</a></li>
+                <li>只看 <code>type</code>、对象类型、函数</li>
+                <li>回到 <a href="/E:/GitHub/AvaStack/services/admin-web/src/main.ts:13">main.ts</a></li>
+                <li>只找 <code>ServiceHealth</code>、<code>SessionItem</code>、<code>fetchJSON()</code></li>
+              </ul>
+            </div>
+            <div class="step-card">
+              <h4>第二天这一轮</h4>
+              <ul>
+                <li>看 <a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Fetch_API" target="_blank" rel="noopener">MDN Fetch API</a></li>
+                <li>回到 <a href="/E:/GitHub/AvaStack/services/admin-web/src/main.ts:99">bootstrap()</a></li>
+                <li>回答：它先请求了哪个接口？失败时页面怎么提示？</li>
+              </ul>
+            </div>
+            <div class="step-card">
+              <h4>第三天这一轮</h4>
+              <ul>
+                <li>如果 DOM 很陌生，再看 <a href="https://developer.mozilla.org/zh-CN/docs/Learn_web_development/Core/Scripting" target="_blank" rel="noopener">MDN JS 学习路径</a></li>
+                <li>回来看 <code>renderHealth()</code> 和 <code>renderSessions()</code></li>
+                <li>把“当前还没有会话”改成你自己的提示语</li>
+              </ul>
+            </div>
+          </div>
+          <div class="practice">
+            <strong>实践任务：</strong>给会话列表多展示一个字段，或者给服务健康状态改一个更醒目的提示文案。
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="lang">
+      <div class="section-head">
+        <h2>语言学习细化版</h2>
+        <p>不是让你把整门语言学完，而是先学到“能读、能改、能验证”。</p>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <h3>Python：第一优先级</h3>
+          <ul class="plain-list">
+            <li>先学变量、函数、字典、列表、类。</li>
+            <li>把每个概念都回仓库里找一次。</li>
+            <li>你现在最重要的目标，不是“精通 Python”，而是敢改一个 FastAPI 服务的返回值。</li>
+          </ul>
+          <div class="resource-box">
+            <h4>最省力的资料顺序</h4>
+            <ul>
+              <li><a href="https://docs.python.org/zh-cn/3/tutorial/" target="_blank" rel="noopener">Python 官方教程（中文）</a></li>
+              <li><a href="https://fastapi.tiangolo.com/zh/" target="_blank" rel="noopener">FastAPI 官方教程（中文）</a></li>
+              <li><a href="https://pydantic.dev/docs/validation/latest/get-started/" target="_blank" rel="noopener">Pydantic Get Started</a></li>
+              <li><a href="https://docs.python.org/zh-cn/3/library/venv.html" target="_blank" rel="noopener">venv 官方文档</a></li>
+            </ul>
+          </div>
+        </article>
+        <article class="card">
+          <h3>TypeScript：第二优先级</h3>
+          <ul class="plain-list">
+            <li>先看类型定义、函数、<code>fetch</code>、DOM 查询。</li>
+            <li>始终围绕 3 个问题：这个类型约束什么？这个请求打哪个接口？这段模板显示到哪？</li>
+            <li>最先要做到的是改一个页面展示细节。</li>
+          </ul>
+          <div class="resource-box">
+            <h4>最省力的资料顺序</h4>
+            <ul>
+              <li><a href="https://www.typescriptlang.org/docs/handbook/intro.html" target="_blank" rel="noopener">TypeScript Handbook</a></li>
+              <li><a href="https://developer.mozilla.org/zh-CN/docs/Learn_web_development/Core/Scripting" target="_blank" rel="noopener">MDN JavaScript 学习路径</a></li>
+              <li><a href="https://developer.mozilla.org/zh-CN/docs/Web/API/Fetch_API" target="_blank" rel="noopener">MDN Fetch API</a></li>
+              <li><a href="https://cn.vitejs.dev/guide/" target="_blank" rel="noopener">Vite 官方中文文档</a></li>
+            </ul>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Go：第三优先级</h3>
+          <ul class="plain-list">
+            <li>先学 <code>func</code>、<code>struct</code>、<code>map</code>、<code>if err != nil</code>。</li>
+            <li>把 Go 当成“为了解一条请求链路才学”，不是“先学会 Go 才能看项目”。</li>
+            <li>先追路由，再看会话存储，再看状态流转。</li>
+          </ul>
+          <div class="resource-box">
+            <h4>最省力的资料顺序</h4>
+            <ul>
+              <li><a href="https://go.dev/doc/tutorial/getting-started" target="_blank" rel="noopener">Get started with Go</a></li>
+              <li><a href="https://go.dev/tour/" target="_blank" rel="noopener">A Tour of Go</a></li>
+              <li><a href="https://go.dev/doc/effective_go" target="_blank" rel="noopener">Effective Go</a></li>
+            </ul>
+          </div>
+        </article>
+        <article class="card">
+          <h3>完全零基础时的节奏建议</h3>
+          <div class="timeline">
+            <div class="timeline-item">
+              <h4>第 1 周</h4>
+              <p>先跑项目，同时补一点 Python 基础，看最简单的 ASR / TTS 服务。</p>
+            </div>
+            <div class="timeline-item">
+              <h4>第 2 周</h4>
+              <p>继续补 FastAPI，看 LLM 服务，改一次 stub 返回值。</p>
+            </div>
+            <div class="timeline-item">
+              <h4>第 3 周</h4>
+              <p>开始补 TypeScript，看管理台页面，改一次文案或字段展示。</p>
+            </div>
+            <div class="timeline-item">
+              <h4>第 4 周</h4>
+              <p>开始补 Go，追一条 <code>POST /v1/sessions</code> 的请求链路。</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="phase7">
+      <div class="section-head">
+        <h2>阶段 7：最后再碰 LiveKit、SRS 和真实模型</h2>
+        <p>这些都更偏进阶，不要一开始就拿最重的主题吓自己。</p>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <h3>现在只需要知道什么</h3>
+          <ul class="plain-list">
+            <li><a href="/E:/GitHub/AvaStack/infra/livekit/livekit.yaml:1">infra/livekit/livekit.yaml</a> 是 LiveKit 的基础配置。</li>
+            <li><a href="/E:/GitHub/AvaStack/infra/srs/srs.conf:1">infra/srs/srs.conf</a> 是 SRS 的基础配置。</li>
+            <li><a href="/E:/GitHub/AvaStack/infra/vllm/README.md:1">infra/vllm/README.md</a> 说明未来 LLM 真实化方向。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>进阶资料入口</h3>
+          <ul class="plain-list">
+            <li><a href="https://webrtc.org/getting-started/overview" target="_blank" rel="noopener">WebRTC Overview</a></li>
+            <li><a href="https://docs.livekit.io/intro/overview/" target="_blank" rel="noopener">LiveKit Documentation</a></li>
+            <li><a href="https://ossrs.io/lts/zh-cn/docs/v6/doc/introduction" target="_blank" rel="noopener">SRS 官方文档（中文）</a></li>
+            <li><a href="https://docs.vllm.ai/en/latest/" target="_blank" rel="noopener">vLLM 文档</a></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-note">
+      <p>AvaStack 学习路线图 HTML 版。当前重点是：先把骨架跑起来、搞懂流程、敢改小功能，再逐步进入真实模型和实时链路。</p>
+    </div>
+  </footer>
+</body>
+</html>
