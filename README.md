@@ -39,7 +39,7 @@ shared/
 2. 再看 [docs/service-decomposition.md](docs/service-decomposition.md)
 3. 将 `.env.example` 复制为 `.env`
 4. 如需代理，先配置代理
-5. 运行 `docker compose up --build` 启动当前的骨架服务
+5. 运行 `docker compose up --build` 或直接使用仓库内启动脚本，启动当前的骨架服务
 
 推荐直接运行：
 
@@ -54,6 +54,7 @@ shared/
    - 如果需要下载依赖，会先提醒你配置代理
    - 如果传入 `-Proxy`，会把代理注入到 `docker build` 阶段
    - 如果构建失败，会尽量区分是基础镜像拉取失败、代理连接失败，还是代码编译失败
+   - 启动成功后会以后台模式拉起 compose，并直接打印访问入口表、端口映射表和启动完成文本图
    - 如果 `docker` 环境未就绪，则输出安装和修复指引
 2. 正式本地开发模式：`./start.ps1 -Mode local`
    - 先一次性检测 `go`、`node/npm`、`python/pip`
@@ -73,6 +74,13 @@ Invoke-RestMethod -Method Post -Uri http://localhost:58080/v1/sessions -ContentT
 ```
 
 当前仓库还是架构骨架，不是完整产品实现。现有接口故意保持最小化，并返回结构化的 stub 数据，目的是先把服务边界、编排关系和部署形态定清楚，再逐步接入真实模型能力。
+
+如果你使用 `./start.ps1`，启动完成后命令行里会直接给出：
+
+- 可访问地址表
+- 端口与服务对应表
+- 一份纯文本启动拓扑图
+- 常用后续命令（`docker compose ps` / `docker compose logs -f` / `docker compose down`）
 
 ## 代理说明
 
@@ -147,6 +155,8 @@ SRS_HTTP_PORT=68081
 
 ## 当前启动后的访问入口
 
+- `./start.ps1` 启动成功后，命令行里也会自动打印下面这些入口
 - 正式骨架模式：管理台 `http://localhost:54173`，编排层 `http://localhost:58080`
 - LiveKit：`ws://localhost:57880`
-- SRS HTTP 管理口：`http://localhost:51985`
+- SRS API：`http://localhost:51985`
+- SRS HTTP：`http://localhost:58081`

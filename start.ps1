@@ -248,10 +248,21 @@ function Invoke-CommandWithLiveOutput {
     )
 
     $lines = New-Object System.Collections.Generic.List[string]
+    $lastPrintedBlankLine = $false
     & $FilePath @Arguments 2>&1 | ForEach-Object {
-        $line = $_.ToString()
+        $line = $_.ToString().TrimEnd()
         $lines.Add($line)
-        Write-Host $line
+
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            if (-not $lastPrintedBlankLine) {
+                Write-Host ""
+                $lastPrintedBlankLine = $true
+            }
+        }
+        else {
+            Write-Host $line
+            $lastPrintedBlankLine = $false
+        }
     }
 
     return @{
@@ -348,6 +359,199 @@ function New-CheckRow {
         Result      = $Result
         Passed      = $Passed
         InstallHint = $InstallHint
+    }
+}
+
+<#
+.SYNOPSIS
+    计算文本在终端中的显示宽度。
+
+.DESCRIPTION
+    PowerShell 的普通字符串补空格只按字符数对齐，遇到中文、全角符号时会偏移。
+    这里按 East Asian Wide / FullWidth 字符宽度为 2，其余常规字符宽度为 1
+    的规则估算显示宽度，用于控制台排版。
+
+.PARAMETER Text
+    待计算的文本。
+
+.OUTPUTS
+    System.Int32 — 估算显示宽度。
+#>
+function Get-TextDisplayWidth {
+    param([AllowNull()][string]$Text)
+
+    if ([string]::IsNullOrEmpty($Text)) {
+        return 0
+    }
+
+    $width = 0
+    foreach ($char in $Text.ToCharArray()) {
+        if ([char]::IsControl($char)) {
+            continue
+        }
+
+        if ($char -eq "`t") {
+            $width += 4
+            continue
+        }
+
+        $code = [int][char]$char
+        $isWide = (
+            ($code -ge 0x1100 -and $code -le 0x115F) -or
+            $code -eq 0x2329 -or
+            $code -eq 0x232A -or
+            ($code -ge 0x2E80 -and $code -le 0xA4CF -and $code -ne 0x303F) -or
+            ($code -ge 0xAC00 -and $code -le 0xD7A3) -or
+            ($code -ge 0xF900 -and $code -le 0xFAFF) -or
+            ($code -ge 0xFE10 -and $code -le 0xFE19) -or
+            ($code -ge 0xFE30 -and $code -le 0xFE6F) -or
+            ($code -ge 0xFF01 -and $code -le 0xFF60) -or
+            ($code -ge 0xFFE0 -and $code -le 0xFFE6)
+        )
+
+        $width += if ($isWide) { 2 } else { 1 }
+    }
+
+    return $width
+}
+
+<#
+.SYNOPSIS
+    按显示宽度向右补齐文本。
+
+.DESCRIPTION
+    基于 Get-TextDisplayWidth 计算差值并补空格，保证中文和英文混排时的列对齐。
+
+.PARAMETER Text
+    原始文本。
+
+.PARAMETER Width
+    目标显示宽度。
+
+.OUTPUTS
+    System.String — 补齐后的文本。
+#>
+function Pad-TextRight {
+    param(
+        [AllowNull()][string]$Text,
+        [Parameter(Mandatory = $true)][int]$Width
+    )
+
+    $value = if ($null -eq $Text) { "" } else { [string]$Text }
+    $paddingWidth = [Math]::Max(0, $Width - (Get-TextDisplayWidth -Text $value))
+    return $value + (" " * $paddingWidth)
+}
+
+<#
+.SYNOPSIS
+    生成统一宽度的横线。
+
+.PARAMETER Width
+    横线宽度。
+
+.PARAMETER Char
+    横线字符。
+
+.OUTPUTS
+    System.String — 横线文本。
+#>
+function New-LineText {
+    param(
+        [Parameter(Mandatory = $true)][int]$Width,
+        [string]$Char = "-"
+    )
+
+    return ($Char * [Math]::Max(1, $Width))
+}
+
+<#
+.SYNOPSIS
+    从行对象中读取表格列文本。
+
+.PARAMETER Row
+    当前行对象。
+
+.PARAMETER Column
+    列配置。
+
+.OUTPUTS
+    System.String — 该列的显示文本。
+#>
+function Get-TableCellValue {
+    param(
+        [Parameter(Mandatory = $true)]$Row,
+        [Parameter(Mandatory = $true)][hashtable]$Column
+    )
+
+    if ($Column.ContainsKey("Formatter") -and $null -ne $Column.Formatter) {
+        return [string](& $Column.Formatter $Row)
+    }
+
+    return [string]$Row.($Column.Key)
+}
+
+<#
+.SYNOPSIS
+    按显示宽度输出对齐表格。
+
+.DESCRIPTION
+    所有表格统一走这一套逻辑，避免中英文混排导致的错位。
+
+.PARAMETER Rows
+    表格行对象数组。
+
+.PARAMETER Columns
+    列配置数组，每列至少需要 Header 与 Key；也可提供 Formatter / MinWidth。
+#>
+function Write-DisplayTable {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Rows,
+        [Parameter(Mandatory = $true)][hashtable[]]$Columns
+    )
+
+    if ($null -eq $Rows) {
+        $Rows = @()
+    }
+
+    $widthMap = @{}
+    foreach ($column in $Columns) {
+        $width = Get-TextDisplayWidth -Text $column.Header
+        if ($column.ContainsKey("MinWidth")) {
+            $width = [Math]::Max($width, [int]$column.MinWidth)
+        }
+
+        foreach ($row in $Rows) {
+            $cellText = Get-TableCellValue -Row $row -Column $column
+            $width = [Math]::Max($width, (Get-TextDisplayWidth -Text $cellText))
+        }
+
+        $widthMap[$column.Header] = $width
+    }
+
+    $headerParts = @()
+    $separatorParts = @()
+    for ($i = 0; $i -lt $Columns.Count; $i++) {
+        $column = $Columns[$i]
+        $width = $widthMap[$column.Header]
+        $isLast = ($i -eq $Columns.Count - 1)
+        $headerParts += if ($isLast) { $column.Header } else { Pad-TextRight -Text $column.Header -Width $width }
+        $separatorParts += if ($isLast) { New-LineText -Width ([Math]::Max(12, $width)) } else { New-LineText -Width $width }
+    }
+
+    Write-Host ($headerParts -join "  ")
+    Write-Host ($separatorParts -join "  ")
+
+    foreach ($row in $Rows) {
+        $lineParts = @()
+        for ($i = 0; $i -lt $Columns.Count; $i++) {
+            $column = $Columns[$i]
+            $width = $widthMap[$column.Header]
+            $cellText = Get-TableCellValue -Row $row -Column $column
+            $isLast = ($i -eq $Columns.Count - 1)
+            $lineParts += if ($isLast) { $cellText } else { Pad-TextRight -Text $cellText -Width $width }
+        }
+
+        Write-Host ($lineParts -join "  ")
     }
 }
 
@@ -839,10 +1043,32 @@ function Test-DockerPrerequisites {
 function Write-SectionHeader {
     param([Parameter(Mandatory = $true)][string]$Title)
 
+    $label = "[ $Title ]"
+    $lineWidth = [Math]::Max(56, (Get-TextDisplayWidth -Text $label))
+
     Write-Host ""
-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkCyan
-    Write-Host "  $Title" -ForegroundColor Cyan
-    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkCyan
+    Write-Host (New-LineText -Width $lineWidth -Char "-") -ForegroundColor DarkCyan
+    Write-Host $label -ForegroundColor Cyan
+    Write-Host (New-LineText -Width $lineWidth -Char "-") -ForegroundColor DarkCyan
+}
+
+<#
+.SYNOPSIS
+    输出脚本主标题。
+
+.DESCRIPTION
+    主标题与分节标题使用同一套显示宽度规则，避免中文标题在 box/line 中出现视觉偏移。
+
+.PARAMETER Title
+    主标题文本。
+#>
+function Write-MainBanner {
+    param([Parameter(Mandatory = $true)][string]$Title)
+
+    $lineWidth = [Math]::Max(56, (Get-TextDisplayWidth -Text $Title))
+    Write-Host (New-LineText -Width $lineWidth -Char "=") -ForegroundColor Cyan
+    Write-Host $Title -ForegroundColor Cyan
+    Write-Host (New-LineText -Width $lineWidth -Char "=") -ForegroundColor Cyan
 }
 
 <#
@@ -860,26 +1086,14 @@ function Write-SectionHeader {
 function Write-CheckTable {
     param([Parameter(Mandatory = $true)][object[]]$Rows)
 
-    # 各列宽度（字符数），经过实测调整以适配中英文混合内容
-    $componentWidth = 14
-    $requirementWidth = 18
-    $resultWidth = 10
+    $columns = @(
+        @{ Header = "组件";     Key = "Component";   MinWidth = 12 },
+        @{ Header = "要求";     Key = "Requirement"; MinWidth = 16 },
+        @{ Header = "结果";     Key = "Result";      MinWidth = 8  },
+        @{ Header = "当前状态"; Key = "Current";     MinWidth = 12 }
+    )
 
-    # 表头和分隔线
-    $header = "{0,-$componentWidth} {1,-$requirementWidth} {2,-$resultWidth} {3}" -f "组件", "要求", "结果", "当前状态"
-    $separator = "{0,-$componentWidth} {1,-$requirementWidth} {2,-$resultWidth} {3}" -f ("-" * 4), ("-" * 4), ("-" * 4), ("-" * 4)
-
-    Write-Host $header
-    Write-Host $separator
-
-    foreach ($row in $Rows) {
-        $line = "{0,-$componentWidth} {1,-$requirementWidth} {2,-$resultWidth} {3}" -f `
-            $row.Component, `
-            $row.Requirement, `
-            $row.Result, `
-            $row.Current
-        Write-Host $line
-    }
+    Write-DisplayTable -Rows $Rows -Columns $columns
 }
 
 <#
@@ -930,20 +1144,17 @@ function Write-ProxyReminder {
     param([Parameter(Mandatory = $true)][string]$Scenario)
 
     $proxyExample = Get-ProxyExampleValue
+    $labelWidth = 12
 
     Write-Host ""
     Write-Host "下载前代理提醒：" -ForegroundColor Yellow
-    Write-Host "  如果你当前网络访问外网较慢或受限，建议先在当前 PowerShell 会话里设置代理，再执行下面需要下载的步骤。" -ForegroundColor DarkYellow
-    Write-Host "  `\$env:HTTP_PROXY  = `"$proxyExample`"" -ForegroundColor Cyan
-    Write-Host "  `\$env:HTTPS_PROXY = `"$proxyExample`"" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "  配置完代理后，直接继续执行下面的命令即可，不需要额外改脚本。" -ForegroundColor DarkGray
-    Write-Host "  注意：这个代理主要用于 docker compose build 阶段容器内的 pip / npm / go 下载。" -ForegroundColor DarkGray
-    Write-Host "  如果报错发生在 FROM 基础镜像拉取阶段，还需要在 Docker Desktop 里单独配置代理。" -ForegroundColor DarkGray
+    Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '$env:HTTP_PROXY' -Width $labelWidth), ('= "{0}"' -f $proxyExample)) -ForegroundColor Cyan
+    Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '$env:HTTPS_PROXY' -Width $labelWidth), ('= "{0}"' -f $proxyExample)) -ForegroundColor Cyan
+    Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '用途' -Width $labelWidth), 'docker compose build 阶段的 pip / npm / go 下载') -ForegroundColor DarkGray
+    Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '注意' -Width $labelWidth), '如果失败点在 FROM 拉基础镜像，还要去 Docker Desktop 单独配代理') -ForegroundColor DarkGray
 
     if ($Scenario -eq "docker") {
-        Write-Host "  Docker 模式也支持直接这样传入代理：" -ForegroundColor DarkGray
-        Write-Host "  ./start.ps1 -Mode docker -Proxy `"$proxyExample`"" -ForegroundColor Cyan
+        Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '也可直接传入' -Width $labelWidth), ('./start.ps1 -Mode docker -Proxy "{0}"' -f $proxyExample)) -ForegroundColor Cyan
     }
 }
 
@@ -1180,6 +1391,289 @@ function Write-InstallGuidesFromRows {
             "docker_daemon" { Write-InstallGuide-DockerDaemon -HasRancher $HasRancher -HasDockerDesktop $HasDockerDesktop }
         }
     }
+}
+
+<#
+.SYNOPSIS
+    读取 docker compose 当前各服务状态。
+
+.DESCRIPTION
+    通过 `docker compose ps --format json` 获取当前服务状态，并整理成
+    以 compose service 名称为 key 的状态表，供启动完成摘要复用。
+
+.OUTPUTS
+    Hashtable — key 为 compose service 名称，value 为状态文本。
+#>
+function Get-DockerComposeServiceStateMap {
+    $stateMap = @{}
+    $statusJson = Get-CommandOutputText -FilePath "docker" -Arguments @("compose", "ps", "--format", "json")
+    if ([string]::IsNullOrWhiteSpace($statusJson)) {
+        return $stateMap
+    }
+
+    $items = @()
+    try {
+        $parsed = $statusJson | ConvertFrom-Json -ErrorAction Stop
+        if ($parsed -is [System.Collections.IEnumerable] -and -not ($parsed -is [string])) {
+            $items += @($parsed)
+        }
+        else {
+            $items += $parsed
+        }
+    }
+    catch {
+        foreach ($line in ($statusJson -split "\r?\n")) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+
+            try {
+                $items += ($line | ConvertFrom-Json -ErrorAction Stop)
+            }
+            catch {
+                continue
+            }
+        }
+    }
+
+    if ($items.Count -eq 0) {
+        return $stateMap
+    }
+
+    foreach ($item in @($items)) {
+        if ($null -eq $item -or [string]::IsNullOrWhiteSpace($item.Service)) {
+            continue
+        }
+
+        $stateText = $item.State
+        if (-not [string]::IsNullOrWhiteSpace($item.Health)) {
+            $stateText = "$stateText / $($item.Health)"
+        }
+
+        if ([string]::IsNullOrWhiteSpace($stateText)) {
+            $stateText = "未知"
+        }
+
+        $stateMap[$item.Service] = $stateText
+    }
+
+    return $stateMap
+}
+
+<#
+.SYNOPSIS
+    统一收集启动完成摘要所需的端口上下文。
+
+.DESCRIPTION
+    从当前会话环境变量、.env 和默认值中解析出最终生效的宿主机端口，
+    供访问入口表、端口映射表和文本拓扑图共用，避免多处重复拼接。
+
+.OUTPUTS
+    Hashtable — 包含所有对外访问端口。
+#>
+function Get-DockerStartupContext {
+    return @{
+        OrchestratorPort = Get-EffectiveEnvValue -Name "ORCHESTRATOR_PORT" -DefaultValue "58080"
+        ASRPort          = Get-EffectiveEnvValue -Name "ASR_PORT" -DefaultValue "58101"
+        TTSPort          = Get-EffectiveEnvValue -Name "TTS_PORT" -DefaultValue "58102"
+        AvatarPort       = Get-EffectiveEnvValue -Name "AVATAR_PORT" -DefaultValue "58103"
+        LLMPort          = Get-EffectiveEnvValue -Name "LLM_PORT" -DefaultValue "58104"
+        AdminPort        = Get-EffectiveEnvValue -Name "ADMIN_PORT" -DefaultValue "54173"
+        LiveKitPort      = Get-EffectiveEnvValue -Name "LIVEKIT_PORT" -DefaultValue "57880"
+        LiveKitTcpPort   = Get-EffectiveEnvValue -Name "LIVEKIT_TCP_PORT" -DefaultValue "57881"
+        LiveKitUdpPort   = Get-EffectiveEnvValue -Name "LIVEKIT_UDP_PORT" -DefaultValue "57882"
+        SrsRtmpPort      = Get-EffectiveEnvValue -Name "SRS_RTMP_PORT" -DefaultValue "51935"
+        SrsApiPort       = Get-EffectiveEnvValue -Name "SRS_API_PORT" -DefaultValue "51985"
+        SrsHttpPort      = Get-EffectiveEnvValue -Name "SRS_HTTP_PORT" -DefaultValue "58081"
+    }
+}
+
+<#
+.SYNOPSIS
+    获取某个 compose 服务的显示状态。
+
+.DESCRIPTION
+    从 Get-DockerComposeServiceStateMap 返回的状态表中读取状态。
+    如果当前拿不到状态，则返回“未读取”而不是报错。
+
+.PARAMETER StateMap
+    compose 服务状态表。
+
+.PARAMETER ComposeService
+    compose.yaml 中的服务名。
+
+.OUTPUTS
+    System.String — 用于表格展示的状态文本。
+#>
+function Get-ServiceStateText {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$StateMap,
+        [Parameter(Mandatory = $true)][string]$ComposeService
+    )
+
+    if ($StateMap.ContainsKey($ComposeService)) {
+        return $StateMap[$ComposeService]
+    }
+
+    return "未读取"
+}
+
+<#
+.SYNOPSIS
+    输出启动后的端口映射与服务总表。
+
+.DESCRIPTION
+    汇总每个服务最终暴露到宿主机的端口、协议、访问地址和当前状态，
+    让用户一眼看清“哪个端口对应哪个服务”。
+
+.PARAMETER Context
+    启动端口上下文。
+
+.PARAMETER StateMap
+    compose 服务状态表。
+#>
+function Write-DockerServicePortTable {
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$Context,
+        [Parameter(Mandatory = $true)][hashtable]$StateMap
+    )
+
+    $rows = @(
+        [PSCustomObject]@{ Service = "管理台";      Protocol = "http"; PortMap = "$($Context.AdminPort) -> 4173";              Address = "http://localhost:$($Context.AdminPort)";               Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "avastack-admin" },
+        [PSCustomObject]@{ Service = "编排层 API";  Protocol = "http"; PortMap = "$($Context.OrchestratorPort) -> 8080";       Address = "http://localhost:$($Context.OrchestratorPort)";        Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "avastack-orchestrator" },
+        [PSCustomObject]@{ Service = "ASR";         Protocol = "http"; PortMap = "$($Context.ASRPort) -> 8101";                Address = "http://localhost:$($Context.ASRPort)";                 Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "avastack-asr" },
+        [PSCustomObject]@{ Service = "TTS";         Protocol = "http"; PortMap = "$($Context.TTSPort) -> 8102";                Address = "http://localhost:$($Context.TTSPort)";                 Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "avastack-tts" },
+        [PSCustomObject]@{ Service = "Avatar";      Protocol = "http"; PortMap = "$($Context.AvatarPort) -> 8103";             Address = "http://localhost:$($Context.AvatarPort)";              Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "avastack-avatar" },
+        [PSCustomObject]@{ Service = "LLM";         Protocol = "http"; PortMap = "$($Context.LLMPort) -> 8104";                Address = "http://localhost:$($Context.LLMPort)";                 Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "avastack-llm" },
+        [PSCustomObject]@{ Service = "LiveKit";     Protocol = "ws";   PortMap = "$($Context.LiveKitPort) -> 7880";            Address = "ws://localhost:$($Context.LiveKitPort)";               Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "livekit" },
+        [PSCustomObject]@{ Service = "LiveKit TCP"; Protocol = "tcp";  PortMap = "$($Context.LiveKitTcpPort) -> 7881";         Address = "tcp://localhost:$($Context.LiveKitTcpPort)";           Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "livekit" },
+        [PSCustomObject]@{ Service = "LiveKit UDP"; Protocol = "udp";  PortMap = "$($Context.LiveKitUdpPort) -> 7882/udp";     Address = "udp://localhost:$($Context.LiveKitUdpPort)";           Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "livekit" },
+        [PSCustomObject]@{ Service = "SRS RTMP";    Protocol = "rtmp"; PortMap = "$($Context.SrsRtmpPort) -> 1935";            Address = "rtmp://localhost:$($Context.SrsRtmpPort)/live";        Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "srs" },
+        [PSCustomObject]@{ Service = "SRS API";     Protocol = "http"; PortMap = "$($Context.SrsApiPort) -> 1985";             Address = "http://localhost:$($Context.SrsApiPort)";              Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "srs" },
+        [PSCustomObject]@{ Service = "SRS HTTP";    Protocol = "http"; PortMap = "$($Context.SrsHttpPort) -> 8080";            Address = "http://localhost:$($Context.SrsHttpPort)";             Status = Get-ServiceStateText -StateMap $StateMap -ComposeService "srs" }
+    )
+
+    $columns = @(
+        @{ Header = "服务";     Key = "Service";  MinWidth = 10 },
+        @{ Header = "协议";     Key = "Protocol"; MinWidth = 6  },
+        @{ Header = "端口映射"; Key = "PortMap";  MinWidth = 18 },
+        @{ Header = "状态";     Key = "Status";   MinWidth = 10 },
+        @{ Header = "访问地址"; Key = "Address";  MinWidth = 16 }
+    )
+
+    Write-DisplayTable -Rows $rows -Columns $columns
+}
+
+<#
+.SYNOPSIS
+    输出常用访问入口表。
+
+.DESCRIPTION
+    从端口上下文拼出最常用的浏览器 / API 入口，
+    方便启动完成后直接复制访问。
+
+.PARAMETER Context
+    启动端口上下文。
+#>
+function Write-DockerAccessTable {
+    param([Parameter(Mandatory = $true)][hashtable]$Context)
+
+    $rows = @(
+        [PSCustomObject]@{ Entry = "管理台首页";  Address = "http://localhost:$($Context.AdminPort)";                                 Purpose = "打开前端控制台" },
+        [PSCustomObject]@{ Entry = "编排层信息";  Address = "http://localhost:$($Context.OrchestratorPort)/v1/info";                   Purpose = "查看编排层信息" },
+        [PSCustomObject]@{ Entry = "服务健康";    Address = "http://localhost:$($Context.OrchestratorPort)/v1/services/health";        Purpose = "聚合查看下游服务健康" },
+        [PSCustomObject]@{ Entry = "会话列表";    Address = "http://localhost:$($Context.OrchestratorPort)/v1/sessions";               Purpose = "查看当前会话数据" },
+        [PSCustomObject]@{ Entry = "ASR 健康";    Address = "http://localhost:$($Context.ASRPort)/healthz";                           Purpose = "检查 ASR 服务" },
+        [PSCustomObject]@{ Entry = "TTS 健康";    Address = "http://localhost:$($Context.TTSPort)/healthz";                           Purpose = "检查 TTS 服务" },
+        [PSCustomObject]@{ Entry = "Avatar 健康"; Address = "http://localhost:$($Context.AvatarPort)/healthz";                        Purpose = "检查 Avatar 服务" },
+        [PSCustomObject]@{ Entry = "LLM 健康";    Address = "http://localhost:$($Context.LLMPort)/healthz";                           Purpose = "检查 LLM 服务" },
+        [PSCustomObject]@{ Entry = "LiveKit WS";  Address = "ws://localhost:$($Context.LiveKitPort)";                                 Purpose = "实时音视频 WebSocket 入口" },
+        [PSCustomObject]@{ Entry = "SRS API";     Address = "http://localhost:$($Context.SrsApiPort)";                                Purpose = "SRS 管理 / RTC API" },
+        [PSCustomObject]@{ Entry = "SRS HTTP";    Address = "http://localhost:$($Context.SrsHttpPort)";                               Purpose = "SRS HTTP 服务入口" }
+    )
+
+    $columns = @(
+        @{ Header = "入口"; Key = "Entry";   MinWidth = 10 },
+        @{ Header = "地址"; Key = "Address"; MinWidth = 36 },
+        @{ Header = "说明"; Key = "Purpose"; MinWidth = 16 }
+    )
+
+    Write-DisplayTable -Rows $rows -Columns $columns
+}
+
+<#
+.SYNOPSIS
+    输出启动完成后的文本拓扑图。
+
+.DESCRIPTION
+    用纯文本把“浏览器入口 → 编排层 → 下游模型 / 实时基础设施”的关系画出来，
+    方便刚启动完时快速建立整体心智图。
+
+.PARAMETER Context
+    启动端口上下文。
+#>
+function Write-DockerStartupTopology {
+    param([Parameter(Mandatory = $true)][hashtable]$Context)
+
+    $nodeWidth = 12
+    Write-Host "浏览器 / 调用方"
+    Write-Host ("├─ {0} {1}" -f (Pad-TextRight -Text "管理台" -Width $nodeWidth), ("http://localhost:{0}" -f $Context.AdminPort))
+    Write-Host ("└─ {0} {1}" -f (Pad-TextRight -Text "编排层 API" -Width $nodeWidth), ("http://localhost:{0}" -f $Context.OrchestratorPort))
+    Write-Host "   ├─ 基础接口"
+    Write-Host "   │  ├─ /v1/info"
+    Write-Host "   │  ├─ /v1/services/health"
+    Write-Host "   │  └─ /v1/sessions"
+    Write-Host "   ├─ 下游模型服务"
+    Write-Host ("   │  ├─ {0} {1}" -f (Pad-TextRight -Text "ASR" -Width $nodeWidth), ("http://localhost:{0}/healthz" -f $Context.ASRPort))
+    Write-Host ("   │  ├─ {0} {1}" -f (Pad-TextRight -Text "TTS" -Width $nodeWidth), ("http://localhost:{0}/healthz" -f $Context.TTSPort))
+    Write-Host ("   │  ├─ {0} {1}" -f (Pad-TextRight -Text "Avatar" -Width $nodeWidth), ("http://localhost:{0}/healthz" -f $Context.AvatarPort))
+    Write-Host ("   │  └─ {0} {1}" -f (Pad-TextRight -Text "LLM" -Width $nodeWidth), ("http://localhost:{0}/healthz" -f $Context.LLMPort))
+    Write-Host "   └─ 实时基础设施"
+    Write-Host ("      ├─ {0} {1}" -f (Pad-TextRight -Text "LiveKit" -Width $nodeWidth), ("ws://localhost:{0}" -f $Context.LiveKitPort))
+    Write-Host ("      ├─ {0} {1}" -f (Pad-TextRight -Text "SRS API" -Width $nodeWidth), ("http://localhost:{0}" -f $Context.SrsApiPort))
+    Write-Host ("      └─ {0} {1}" -f (Pad-TextRight -Text "SRS HTTP" -Width $nodeWidth), ("http://localhost:{0}" -f $Context.SrsHttpPort))
+}
+
+<#
+.SYNOPSIS
+    输出 Docker 模式启动完成摘要。
+
+.DESCRIPTION
+    当 compose 已在后台成功拉起后，统一输出：
+    1. 启动完成说明
+    2. 端口与服务映射表
+    3. 常用访问入口表
+    4. 文本拓扑图
+    5. 常用后续命令
+
+.PARAMETER Context
+    启动端口上下文。
+#>
+function Write-DockerStartupSummary {
+    param([Parameter(Mandatory = $true)][hashtable]$Context)
+
+    $stateMap = Get-DockerComposeServiceStateMap
+
+    Write-SectionHeader -Title "启动完成摘要"
+    Write-Host "compose 服务已在后台启动，下面是当前可访问的入口与端口映射。" -ForegroundColor Green
+
+    Write-Host ""
+    Write-Host "对外端口与服务：" -ForegroundColor Yellow
+    Write-DockerServicePortTable -Context $Context -StateMap $stateMap
+
+    Write-Host ""
+    Write-Host "常用访问入口：" -ForegroundColor Yellow
+    Write-DockerAccessTable -Context $Context
+
+    Write-Host ""
+    Write-Host "启动完成文本图：" -ForegroundColor Yellow
+    Write-DockerStartupTopology -Context $Context
+
+    Write-Host ""
+    Write-Host "常用后续命令：" -ForegroundColor Yellow
+    Write-Host "  查看状态：docker compose ps" -ForegroundColor Cyan
+    Write-Host "  查看日志：docker compose logs -f" -ForegroundColor Cyan
+    Write-Host "  停止服务：docker compose down" -ForegroundColor Cyan
 }
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1726,6 +2220,7 @@ function Invoke-DockerComposeUp {
 
     # ── 第一步：构建镜像（build） ──
     # 统一先 build，让镜像拉取和依赖下载的失败先暴露出来。
+    Write-SectionHeader -Title "第 1 步：构建镜像"
     $buildArgs = @("compose", "build")
     $dockerProxyUrl = Convert-ProxyUrlForDockerBuild -ProxyUrl $ProxyUrl
     if (![string]::IsNullOrWhiteSpace($ProxyUrl)) {
@@ -1758,8 +2253,15 @@ function Invoke-DockerComposeUp {
     # ── 第二步：启动容器（up） ──
     # build 成功后直接执行 docker compose up，
     # 此时所有镜像已就绪，up 只会涉及容器创建和端口绑定。
-    & docker compose up
-    exit $LASTEXITCODE
+    Write-SectionHeader -Title "第 2 步：启动容器"
+    $upResult = Invoke-CommandWithLiveOutput -FilePath "docker" -Arguments @("compose", "up", "-d")
+    if ($upResult.ExitCode -ne 0) {
+        exit $upResult.ExitCode
+    }
+
+    $startupContext = Get-DockerStartupContext
+    Write-DockerStartupSummary -Context $startupContext
+    exit 0
 }
 
 <#
@@ -1813,10 +2315,7 @@ function Start-DockerMode {
 # 还是 docker 启动流程。两种模式互斥，不会同时执行。
 # ════════════════════════════════════════════════════════════════════════════
 
-Write-Host ""
-Write-Host "  ╔════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "  ║     AvaStack 启动与环境检查脚本     ║" -ForegroundColor Cyan
-Write-Host "  ╚════════════════════════════════════╝" -ForegroundColor Cyan
+Write-MainBanner -Title "AvaStack 启动与环境检查"
 
 # ── 自动准备 .env 文件 ─────────────────────────────────────────────────
 # 首次进入仓库时，如果 .env 不存在，自动从 .env.example 复制一份。
