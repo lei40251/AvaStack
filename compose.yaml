@@ -3,7 +3,8 @@ services:
     build:
       context: ./services/orchestrator-go
     environment:
-      PORT: ${ORCHESTRATOR_PORT:-8080}
+      # 容器内服务仍监听 8080，宿主机端口通过 ports 映射到外部即可。
+      PORT: 8080
       ASR_BASE_URL: ${ASR_BASE_URL:-http://avastack-asr:8101}
       TTS_BASE_URL: ${TTS_BASE_URL:-http://avastack-tts:8102}
       AVATAR_BASE_URL: ${AVATAR_BASE_URL:-http://avastack-avatar:8103}
@@ -11,7 +12,7 @@ services:
       LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-ws://livekit:7880}
       SRS_RTC_BASE_URL: ${SRS_RTC_BASE_URL:-http://srs:1985}
     ports:
-      - "${ORCHESTRATOR_PORT:-8080}:8080"
+      - "${ORCHESTRATOR_PORT:-58080}:8080"
     depends_on:
       - avastack-asr
       - avastack-tts
@@ -22,33 +23,33 @@ services:
     build:
       context: ./services/model-asr-python
     ports:
-      - "${ASR_PORT:-8101}:8101"
+      - "${ASR_PORT:-58101}:8101"
 
   avastack-tts:
     build:
       context: ./services/model-tts-python
     ports:
-      - "${TTS_PORT:-8102}:8102"
+      - "${TTS_PORT:-58102}:8102"
 
   avastack-avatar:
     build:
       context: ./services/model-avatar-python
     ports:
-      - "${AVATAR_PORT:-8103}:8103"
+      - "${AVATAR_PORT:-58103}:8103"
 
   avastack-llm:
     build:
       context: ./services/model-llm-python
     ports:
-      - "${LLM_PORT:-8104}:8104"
+      - "${LLM_PORT:-58104}:8104"
 
   avastack-admin:
     build:
       context: ./services/admin-web
     ports:
-      - "${ADMIN_PORT:-4173}:4173"
+      - "${ADMIN_PORT:-54173}:4173"
     environment:
-      ORCHESTRATOR_BASE_URL: http://localhost:8080
+      ORCHESTRATOR_BASE_URL: http://localhost:58080
 
   livekit:
     image: livekit/livekit-server:latest
@@ -56,9 +57,9 @@ services:
     volumes:
       - ./infra/livekit/livekit.yaml:/etc/livekit/livekit.yaml:ro
     ports:
-      - "7880:7880"
-      - "7881:7881"
-      - "7882:7882/udp"
+      - "${LIVEKIT_PORT:-57880}:7880"
+      - "${LIVEKIT_TCP_PORT:-57881}:7881"
+      - "${LIVEKIT_UDP_PORT:-57882}:7882/udp"
 
   srs:
     image: ossrs/srs:6
@@ -66,6 +67,6 @@ services:
     volumes:
       - ./infra/srs/srs.conf:/usr/local/srs/conf/srs.conf:ro
     ports:
-      - "1935:1935"
-      - "1985:1985"
-      - "8081:8080"
+      - "${SRS_RTMP_PORT:-51935}:1935"
+      - "${SRS_API_PORT:-51985}:1985"
+      - "${SRS_HTTP_PORT:-58081}:8080"

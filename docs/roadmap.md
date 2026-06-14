@@ -358,7 +358,7 @@ flowchart LR
 如果你要把这个路线独立成新项目，建议一开始就按下面拆：
 
 ```text
-xavatar-platform/
+avastack-platform/
   docs/
   deploy/
     compose/

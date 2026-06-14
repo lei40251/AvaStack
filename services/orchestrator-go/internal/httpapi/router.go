@@ -13,17 +13,17 @@ import (
 )
 
 type Router struct {
-	cfg      config.Config
-	sessions *controlplane.SessionStore
-	services *controlplane.ServiceRegistry
+	cfg          config.Config
+	sessionStore *controlplane.SessionStore
+	services     *controlplane.ServiceRegistry
 }
 
 // NewRouter 负责组装编排层当前阶段的最小 HTTP 路由。
 func NewRouter(cfg config.Config) http.Handler {
 	r := &Router{
-		cfg:      cfg,
-		sessions: controlplane.NewSessionStore(),
-		services: controlplane.NewServiceRegistry(map[string]string{
+		cfg:          cfg,
+		sessionStore: controlplane.NewSessionStore(),
+		services:     controlplane.NewServiceRegistry(map[string]string{
 			"asr":    cfg.ASRBaseURL,
 			"tts":    cfg.TTSBaseURL,
 			"avatar": cfg.AvatarBaseURL,
@@ -33,7 +33,7 @@ func NewRouter(cfg config.Config) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", r.healthz)
 	mux.HandleFunc("/v1/info", r.info)
-	mux.HandleFunc("/v1/sessions", r.sessions)
+	mux.HandleFunc("/v1/sessions", r.handleSessions)
 	mux.HandleFunc("/v1/sessions/", r.sessionByID)
 	mux.HandleFunc("/v1/services/health", r.servicesHealth)
 	return mux
@@ -97,8 +97,8 @@ func (r *Router) info(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// sessions 是后续会话创建入口的占位实现，先把控制面返回结构固定下来。
-func (r *Router) sessions(w http.ResponseWriter, req *http.Request) {
+// handleSessions 统一处理会话集合资源的读写入口，避免路由层和存储字段重名。
+func (r *Router) handleSessions(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodOptions {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 		return
@@ -137,7 +137,7 @@ func (r *Router) getSessionByID(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session, ok := r.sessions.Get(sessionID)
+	session, ok := r.sessionStore.Get(sessionID)
 	if !ok {
 		writeError(w, http.StatusNotFound, "not_found", "session not found")
 		return
@@ -156,7 +156,7 @@ func (r *Router) getSessionByID(w http.ResponseWriter, req *http.Request) {
 
 // listSessions 返回当前内存态会话列表，按创建时间倒序排列。
 func (r *Router) listSessions(w http.ResponseWriter, _ *http.Request) {
-	items := r.sessions.List()
+	items := r.sessionStore.List()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"request_id": newRequestID(),
 		"status":     "ok",
@@ -202,7 +202,7 @@ func (r *Router) createSession(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session := r.sessions.Create(payload, r.cfg.LiveKitWSURL)
+	session := r.sessionStore.Create(payload, r.cfg.LiveKitWSURL)
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"request_id": newRequestID(),
 		"session_id": session.SessionID,
@@ -231,7 +231,7 @@ func (r *Router) updateSessionByID(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session, ok := r.sessions.Update(sessionID, payload)
+	session, ok := r.sessionStore.Update(sessionID, payload)
 	if !ok {
 		writeError(w, http.StatusBadRequest, "bad_request", "invalid session update or session not found")
 		return

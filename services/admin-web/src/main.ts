@@ -8,7 +8,7 @@ if (!app) {
 
 const ORCHESTRATOR_BASE_URL =
   (globalThis as typeof globalThis & { __ORCHESTRATOR_BASE_URL__?: string }).__ORCHESTRATOR_BASE_URL__ ??
-  "http://localhost:8080";
+  "http://localhost:58080";
 
 type ServiceHealth = {
   name: string;

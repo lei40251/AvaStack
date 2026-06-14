@@ -49,7 +49,8 @@
 - **语言：** Go 1.22
 - **依赖：** 纯标准库（net/http, sync, crypto/rand, encoding/json），无第三方依赖
 - **职责：** 对外控制面，会话管理，服务路由，健康聚合
-- **端口：** 8080
+- **容器内端口：** 8080
+- **默认宿主机端口：** 58080
 - **关键文件：**
   - `cmd/api/main.go` — 入口
   - `internal/httpapi/router.go` — HTTP 路由
@@ -68,17 +69,18 @@
 
 | 服务 | 端口 | 职责 |
 |------|------|------|
-| model-asr-python | 8101 | 语音识别服务边界 |
-| model-tts-python | 8102 | 语音合成服务边界 |
-| model-avatar-python | 8103 | 数字人渲染服务边界 |
-| model-llm-python | 8104 | LLM 网关边界 |
+| model-asr-python | 容器内 8101 / 宿主机 58101 | 语音识别服务边界 |
+| model-tts-python | 容器内 8102 / 宿主机 58102 | 语音合成服务边界 |
+| model-avatar-python | 容器内 8103 / 宿主机 58103 | 数字人渲染服务边界 |
+| model-llm-python | 容器内 8104 / 宿主机 58104 | LLM 网关边界 |
 
 ### 管理后台 — `admin-web`（TypeScript）
 
 - **语言：** TypeScript (ES2020)
 - **构建工具：** Vite 5.4.8
 - **特点：** 无 React/Vue 框架，原生 TS + fetch 操作 DOM
-- **端口：** 4173
+- **容器内端口：** 4173
+- **默认宿主机端口：** 54173
 
 ---
 

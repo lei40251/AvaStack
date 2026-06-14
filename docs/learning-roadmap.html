@@ -588,14 +588,14 @@
               <h4>看完立刻做什么</h4>
               <ul>
                 <li>打开 <a href="/E:/GitHub/AvaStack/compose.yaml:1">compose.yaml</a></li>
-                <li>找出哪个服务暴露 <code>8080</code></li>
+                <li>找出哪个服务对宿主机暴露 <code>58080</code>，容器内实际监听仍是 <code>8080</code></li>
                 <li>找出哪个服务对应管理台</li>
                 <li>运行 <code>./start.ps1</code></li>
               </ul>
             </div>
           </div>
           <div class="practice">
-            <strong>实践任务：</strong>启动完成后，访问 <code>http://localhost:8080/healthz</code>、<code>/v1/info</code>、<code>/v1/sessions</code>，再执行一次 <code>POST /v1/sessions</code>。
+            <strong>实践任务：</strong>启动完成后，访问 <code>http://localhost:58080/healthz</code>、<code>/v1/info</code>、<code>/v1/sessions</code>，再执行一次 <code>POST /v1/sessions</code>。
           </div>
           <div class="dos-donts">
             <div class="dos">

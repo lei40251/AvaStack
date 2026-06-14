@@ -110,11 +110,11 @@
 
 ### 你至少要知道这几个入口
 
-- 管理台：`http://localhost:4173`
-- 编排层信息：`http://localhost:8080/v1/info`
-- 服务健康：`http://localhost:8080/v1/services/health`
-- 会话列表：`http://localhost:8080/v1/sessions`
-- 编排层健康：`http://localhost:8080/healthz`
+- 管理台：`http://localhost:54173`
+- 编排层信息：`http://localhost:58080/v1/info`
+- 服务健康：`http://localhost:58080/v1/services/health`
+- 会话列表：`http://localhost:58080/v1/sessions`
+- 编排层健康：`http://localhost:58080/healthz`
 
 ### 推荐实践任务
 
@@ -127,7 +127,7 @@
 启动成功后，再执行一次会话创建请求：
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:8080/v1/sessions -ContentType "application/json" -Body '{"mode":"text_chat","avatar_id":"default-avatar","user_id":"demo-user"}'
+Invoke-RestMethod -Method Post -Uri http://localhost:58080/v1/sessions -ContentType "application/json" -Body '{"mode":"text_chat","avatar_id":"default-avatar","user_id":"demo-user"}'
 ```
 
 然后刷新管理台页面，看看会话列表是否发生变化。
