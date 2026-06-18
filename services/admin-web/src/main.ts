@@ -1,15 +1,23 @@
+// AvaStack 控制台前端（admin-web）
+// 原生 TypeScript 单页应用，直接读取编排层接口展示服务健康和会话状态。
+// 后续可作为运维面板的起点，按需迁移至 React/Vue 等框架。
 import "./styles.css";
 
+// 根容器引用
 const app = document.querySelector<HTMLDivElement>("#app");
 
 if (!app) {
   throw new Error("Missing #app container");
 }
 
+// 编排层基地址，支持通过 runtime-config.js 注入覆盖默认值
 const ORCHESTRATOR_BASE_URL =
   (globalThis as typeof globalThis & { __ORCHESTRATOR_BASE_URL__?: string }).__ORCHESTRATOR_BASE_URL__ ??
   "http://localhost:58080";
 
+// --- 类型定义 ---
+
+/** 下游服务健康状态 */
 type ServiceHealth = {
   name: string;
   healthy: boolean;
@@ -17,6 +25,7 @@ type ServiceHealth = {
   error?: string;
 };
 
+/** 会话列表项 */
 type SessionItem = {
   session_id: string;
   status: string;
@@ -24,6 +33,9 @@ type SessionItem = {
   avatar_id: string;
 };
 
+// --- 工具函数 ---
+
+/** 转义 HTML 特殊字符，防止 XSS 注入 */
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -33,6 +45,7 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
+/** 带错误处理的 JSON 请求封装 */
 async function fetchJSON<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -41,6 +54,9 @@ async function fetchJSON<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+// --- 渲染函数 ---
+
+/** 渲染页面骨架：头部介绍 + 三栏卡片区 */
 function renderShell(): void {
   app.innerHTML = `
     <main class="layout">
@@ -69,6 +85,7 @@ function renderShell(): void {
   `;
 }
 
+/** 渲染服务健康卡片 */
 function renderHealth(items: ServiceHealth[]): void {
   const container = document.querySelector<HTMLDivElement>("#service-health");
   if (!container) return;
@@ -81,6 +98,7 @@ function renderHealth(items: ServiceHealth[]): void {
     .join("");
 }
 
+/** 渲染会话列表卡片 */
 function renderSessions(items: SessionItem[]): void {
   const container = document.querySelector<HTMLDivElement>("#session-list");
   if (!container) return;
@@ -96,9 +114,13 @@ function renderSessions(items: SessionItem[]): void {
     .join("");
 }
 
+// --- 启动入口 ---
+
+/** 应用启动：渲染骨架 → 拉取服务健康 → 拉取会话列表 */
 async function bootstrap(): Promise<void> {
   renderShell();
 
+  // 获取下游服务健康状态
   try {
     const health = await fetchJSON<{ data: { services: ServiceHealth[] } }>(
       `${ORCHESTRATOR_BASE_URL}/v1/services/health`,
@@ -114,6 +136,7 @@ async function bootstrap(): Promise<void> {
     ]);
   }
 
+  // 获取当前会话列表
   try {
     const sessions = await fetchJSON<{ data: { items: SessionItem[] } }>(
       `${ORCHESTRATOR_BASE_URL}/v1/sessions`,

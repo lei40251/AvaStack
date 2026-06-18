@@ -1,3 +1,5 @@
+// Package main 是 AvaStack 编排层（orchestrator）的进程入口。
+// 负责加载配置、组装 HTTP 路由并启动控制面服务。
 package main
 
 import (

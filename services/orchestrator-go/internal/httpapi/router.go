@@ -39,6 +39,7 @@ func NewRouter(cfg config.Config) http.Handler {
 	return mux
 }
 
+// writeJSON 设置 CORS 头后以 JSON 格式写入响应体。
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -48,6 +49,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
+// writeError 按统一的 API 错误响应格式（status/error/meta 信封）写入错误信息。
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, map[string]any{
 		"request_id": newRequestID(),
@@ -62,6 +64,7 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 	})
 }
 
+// newRequestID 生成随机请求追踪 ID，用于日志关联与问题排查。
 func newRequestID() string {
 	buf := make([]byte, 6)
 	if _, err := rand.Read(buf); err != nil {

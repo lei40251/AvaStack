@@ -8,17 +8,22 @@ import (
 	"time"
 )
 
+// SessionStore 是会话的内存态存储实现。
+// 内部使用读写锁保护并发访问，适用于单实例部署场景。
+// 后续可替换为 Redis 或数据库实现相同的存取接口。
 type SessionStore struct {
 	mu       sync.RWMutex
 	sessions map[string]Session
 }
 
+// NewSessionStore 创建一个空的会话存储实例。
 func NewSessionStore() *SessionStore {
 	return &SessionStore{
 		sessions: make(map[string]Session),
 	}
 }
 
+// Create 根据请求参数创建一个新会话，自动分配唯一 ID 并设置初始状态为 "created"。
 func (s *SessionStore) Create(req CreateSessionRequest, liveKitWSURL string) Session {
 	now := time.Now().UTC()
 	session := Session{
@@ -42,6 +47,7 @@ func (s *SessionStore) Create(req CreateSessionRequest, liveKitWSURL string) Ses
 	return session
 }
 
+// Get 按会话 ID 查找会话，第二个返回值为 false 表示未找到。
 func (s *SessionStore) Get(sessionID string) (Session, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -49,6 +55,7 @@ func (s *SessionStore) Get(sessionID string) (Session, bool) {
 	return session, ok
 }
 
+// List 返回所有会话的切片，按创建时间倒序排列。
 func (s *SessionStore) List() []Session {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -64,6 +71,9 @@ func (s *SessionStore) List() []Session {
 	return items
 }
 
+// Update 按会话 ID 更新会话的部分字段。
+// 仅更新请求中非零值的字段，并校验状态迁移的合法性。
+// 第二个返回值为 false 表示更新失败（会话不存在或状态迁移非法）。
 func (s *SessionStore) Update(sessionID string, req UpdateSessionRequest) (Session, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -90,6 +100,7 @@ func (s *SessionStore) Update(sessionID string, req UpdateSessionRequest) (Sessi
 	return session, true
 }
 
+// defaultString 在 value 为空时返回 fallback，相当于环境变量的默认值模式。
 func defaultString(value, fallback string) string {
 	if value == "" {
 		return fallback
@@ -97,6 +108,8 @@ func defaultString(value, fallback string) string {
 	return value
 }
 
+// randomHex 生成 size 字节的加密安全随机数的十六进制表示。
+// 在随机数生成失败时降级为时间戳字符串，保证调用不会阻塞。
 func randomHex(size int) string {
 	buf := make([]byte, size)
 	if _, err := rand.Read(buf); err != nil {
