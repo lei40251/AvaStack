@@ -10,7 +10,7 @@
       脚本会在 compose up 之前先执行 compose build，把"镜像拉取失败"、"容器内
       依赖下载失败"、"端口冲突"三类问题分开暴露，方便快速定位。
 
-    - local：一次性检查本地开发所需的全部工具链（Python、Go、Node.js、npm），
+    - local：一次性检查本地开发所需的全部工具链（Python、Node.js、npm），
       把缺失项和安装指引同时列出，避免修完一个依赖后重复运行脚本才暴露下一个缺失项。
       本地模式下脚本不会自动启动各服务，只负责输出环境报告和依赖安装指引。
 
@@ -26,7 +26,7 @@
 .PARAMETER Mode
     运行模式。可选值：docker（默认）或 local。
     - docker：检查 Docker CLI / Compose / daemon 状态，然后启动所有容器。
-    - local：检查 Python / Go / Node.js / npm 等本地工具链版本。
+    - local：检查 Python / Node.js / npm 等本地工具链版本。
 
 .PARAMETER Proxy
     代理地址，格式如 http://<主机>:<端口>。
@@ -58,7 +58,7 @@ param(
     [ValidateSet("docker", "local")]
     [string]$Mode = "docker",
 
-    # 代理地址，用于容器构建阶段下载依赖（pip/npm/go）
+    # 代理地址，用于容器构建阶段下载依赖（pip/npm）
     [string]$Proxy = ""
 )
 
@@ -89,7 +89,7 @@ $script:RequiredVersionMap = @{
     这是所有工具链检查的基石——先判断"有没有"，再判断"版本够不够"。
 
 .PARAMETER Name
-    要检查的命令名称，如 "python"、"go"、"docker"。
+    要检查的命令名称，如 "python"、"node"、"docker"。
 
 .OUTPUTS
     System.Boolean — 命令存在返回 $true，否则返回 $false。
@@ -315,7 +315,7 @@ function Get-VersionFromText {
     安装指引逻辑都能用统一的数据结构消费，减少字段拼写不一致的问题。
 
 .PARAMETER Id
-    检查项的唯一标识，如 "python"、"go"、"docker"。
+    检查项的唯一标识，如 "python"、"node"、"docker"。
     用于 switch 语句中匹配对应的安装指引函数。
 
 .PARAMETER Component
@@ -722,7 +722,7 @@ function Test-DockerComposeReady {
     一次性检查本地开发模式所需的整套工具链。
 
 .DESCRIPTION
-    按顺序检查 Python → pip → Go → Node.js → npm，全部扫完后再统一输出。
+    按顺序检查 Python → pip → Node.js → npm，全部扫完后再统一输出。
     每个工具的检查逻辑包括：
     1. 可执行文件是否存在（通过 PATH 查找）
     2. 能否正常执行（获取版本信息）
@@ -739,7 +739,6 @@ function Test-DockerComposeReady {
     - Rows (PSCustomObject[])：所有检查行
     - IsReady (bool)：是否全部通过
     - PythonRuntime (Hashtable or $null)：Python 运行时信息
-    - GoPath (string or $null)：Go 可执行文件路径
     - NodePath (string or $null)：Node.js 可执行文件路径
     - NpmPath (string or $null)：npm 可执行文件路径
 #>
@@ -810,35 +809,6 @@ function Test-LocalPrerequisites {
             -InstallHint "执行 python -m ensurepip --upgrade；如果失败，重新安装 Python 并勾选 pip。"
     }
 
-    # ── Go ────────────────────────────────────────────────────────────
-    $goPath = Resolve-CommandPath -Candidates @("go")
-    if ($goPath) {
-        $goVersionText = Get-CommandOutputText -FilePath $goPath -Arguments @("version")
-        # Go 的版本输出格式如 "go version go1.22.5 windows/amd64"
-        $goVersion = Get-VersionFromText -Text $goVersionText -Pattern 'go(\d+\.\d+(?:\.\d+)?)'
-        $goPassed = Test-VersionAtLeast -CurrentVersion $goVersion -MinimumVersion $script:RequiredVersionMap.Go
-        $goResult = if ($goPassed) { "通过" } elseif ($null -eq $goVersion) { "无法识别版本" } else { "版本偏低" }
-
-        $rows += New-CheckRow `
-            -Id "go" `
-            -Component "Go" `
-            -Requirement ">= 1.22" `
-            -CurrentStatus $(if ($goVersionText) { $goVersionText } else { "已检测到可执行文件：$goPath" }) `
-            -Result $goResult `
-            -Passed $goPassed `
-            -InstallHint "升级到 Go 1.22+。"
-    }
-    else {
-        $rows += New-CheckRow `
-            -Id "go" `
-            -Component "Go" `
-            -Requirement ">= 1.22" `
-            -CurrentStatus "未检测到" `
-            -Result "缺少" `
-            -Passed $false `
-            -InstallHint "安装 Go 1.22+。"
-    }
-
     # ── Node.js ───────────────────────────────────────────────────────
     $nodePath = Resolve-CommandPath -Candidates @("node")
     if ($nodePath) {
@@ -900,7 +870,6 @@ function Test-LocalPrerequisites {
         Rows          = $rows
         IsReady       = (($rows | Where-Object { -not $_.Passed }).Count -eq 0)
         PythonRuntime = $pythonRuntime
-        GoPath        = $goPath
         NodePath      = $nodePath
         NpmPath       = $npmPath
     }
@@ -1149,7 +1118,7 @@ function Write-ProxyReminder {
     Write-Host "下载前代理提醒：" -ForegroundColor Yellow
     Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '$env:HTTP_PROXY' -Width $labelWidth), ('= "{0}"' -f $proxyExample)) -ForegroundColor Cyan
     Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '$env:HTTPS_PROXY' -Width $labelWidth), ('= "{0}"' -f $proxyExample)) -ForegroundColor Cyan
-    Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '用途' -Width $labelWidth), 'docker compose build 阶段的 pip / npm / go 下载') -ForegroundColor DarkGray
+    Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '用途' -Width $labelWidth), 'docker compose build 阶段的 pip / npm 下载') -ForegroundColor DarkGray
     Write-Host ('  {0} {1}' -f (Pad-TextRight -Text '注意' -Width $labelWidth), '如果失败点在 FROM 拉基础镜像，还要去 Docker Desktop 单独配代理') -ForegroundColor DarkGray
 
     if ($Scenario -eq "docker") {
@@ -1206,16 +1175,6 @@ function Write-InstallGuide-Pip {
 }
 
 <#
-.SYNOPSIS
-    输出 Go 安装指引。
-#>
-function Write-InstallGuide-Go {
-    Write-Host ""
-    Write-Host "Go 安装方式：" -ForegroundColor Green
-    Write-Host "  官网： https://go.dev/dl/" -ForegroundColor Cyan
-    Write-Host "  winget： winget install --id GoLang.Go --source winget" -ForegroundColor Cyan
-}
-
 <#
 .SYNOPSIS
     输出 Node.js 安装指引（同时覆盖 npm，因为 npm 随 Node.js 安装）。
@@ -1380,7 +1339,6 @@ function Write-InstallGuidesFromRows {
         switch ($row.Id) {
             "python" { Write-InstallGuide-Python }
             "pip" { Write-InstallGuide-Pip }
-            "go" { Write-InstallGuide-Go }
             "nodejs" { Write-InstallGuide-Node }
             "npm" { Write-InstallGuide-Node }    # npm 问题统一用 Node.js 重装解决
             "docker" { Write-InstallGuide-Docker }
@@ -2200,14 +2158,14 @@ function Write-DockerBuildFailureHint {
     这是 Docker 模式的核心执行函数。流程设计为"先 build 再 up"，原因：
 
     1. 镜像拉取（FROM 指令）：走 Docker daemon 网络层
-    2. 容器内依赖下载（pip/npm/go）：走代理注入的容器网络层
+    2. 容器内依赖下载（pip/npm）：走代理注入的容器网络层
     3. 容器启动及端口绑定：走 Docker 网络驱动
 
     三类问题在不同阶段暴露，后续排障提示可以更精准地指向正确方向。
     如果一步到位 docker compose up --build，所有错误混在一起，很难分辨。
 
     当检测到代理配置时，会通过 --build-arg 将代理注入到容器构建阶段，
-    供 Dockerfile 中的 pip/npm/go 等包管理器使用。
+    供 Dockerfile 中的 pip/npm 等包管理器使用。
 
 .PARAMETER ProxyUrl
     代理 URL（可选），为空则直连。
