@@ -1,15 +1,20 @@
 {
-  "name": "avastack-admin",
+  "name": "@avastack/admin-web",
+  "version": "0.2.0",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "nuxt dev --port 4173",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "nuxt": "^3.13.0",
+    "vue": "^3.5.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.2",
-    "vite": "^5.4.8"
+    "typescript": "^5.6.0",
+    "@nuxtjs/tailwindcss": "^6.12.0"
   }
 }
