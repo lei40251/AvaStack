@@ -10,11 +10,11 @@
     "preview": "nuxt preview"
   },
   "dependencies": {
-    "nuxt": "^3.13.0",
-    "vue": "^3.5.0"
+    "nuxt": "^3.21.8",
+    "vue": "^3.5.38"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
-    "@nuxtjs/tailwindcss": "^6.12.0"
+    "@nuxtjs/tailwindcss": "^6.14.0",
+    "typescript": "^5.6.0"
   }
 }
