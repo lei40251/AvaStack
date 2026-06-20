@@ -2176,7 +2176,7 @@ function Invoke-DockerComposeUp {
     # ── 第一步：构建镜像（build） ──
     # 统一先 build，让镜像拉取和依赖下载的失败先暴露出来。
     Write-SectionHeader -Title "第 1 步：构建镜像"
-    $buildArgs = @("compose", "build")
+    $buildArgs = @("compose", "build", "--progress=plain")
     $dockerProxyUrl = Convert-ProxyUrlForDockerBuild -ProxyUrl $ProxyUrl
     if (![string]::IsNullOrWhiteSpace($ProxyUrl)) {
         # 有代理时：将代理环境变量注入到当前 PowerShell 会话，

@@ -1,7 +1,7 @@
 FROM node:22-alpine AS base
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --no-audit --no-fund --loglevel=error
 
 FROM node:22-alpine AS run
 WORKDIR /app
@@ -11,7 +11,7 @@ COPY package.json tsconfig.json ./
 COPY src/ ./src/
 RUN mkdir -p /data && chown avastack:avastack /data
 # 安装 tsx 用于生产运行（Hono tsx 兼容性优于 tsc）
-RUN npm install tsx
+RUN npm install tsx --no-audit --no-fund --loglevel=error
 USER avastack
 EXPOSE 8080
 ENV NODE_ENV=production
