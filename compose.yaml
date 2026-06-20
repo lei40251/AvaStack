@@ -1,23 +1,26 @@
 services:
   avastack-orchestrator:
     build:
-      context: ./services/orchestrator-go
+      context: ./services/orchestrator-ts
+    container_name: avastack-orchestrator
     environment:
       # 容器内服务仍监听 8080，宿主机端口通过 ports 映射到外部即可。
       PORT: 8080
+      DB_PATH: /data/avastack.db
       ASR_BASE_URL: ${ASR_BASE_URL:-http://avastack-asr:8101}
       TTS_BASE_URL: ${TTS_BASE_URL:-http://avastack-tts:8102}
       AVATAR_BASE_URL: ${AVATAR_BASE_URL:-http://avastack-avatar:8103}
       LLM_BASE_URL: ${LLM_BASE_URL:-http://avastack-llm:8104}
-      LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-ws://livekit:7880}
-      SRS_RTC_BASE_URL: ${SRS_RTC_BASE_URL:-http://srs:1985}
     ports:
       - "${ORCHESTRATOR_PORT:-58080}:8080"
+    volumes:
+      - orchestrator-data:/data
     depends_on:
       - avastack-asr
       - avastack-tts
       - avastack-avatar
       - avastack-llm
+    restart: unless-stopped
 
   avastack-asr:
     build:
@@ -70,3 +73,7 @@ services:
       - "${SRS_RTMP_PORT:-51935}:1935"
       - "${SRS_API_PORT:-51985}:1985"
       - "${SRS_HTTP_PORT:-58081}:8080"
+
+volumes:
+  orchestrator-data:
+
