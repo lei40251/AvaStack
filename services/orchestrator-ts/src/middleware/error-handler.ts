@@ -1,11 +1,33 @@
 // src/middleware/error-handler.ts
 // 统一错误响应，格式遵循 ApiErrorBody 契约
+// 同时处理 Zod 校验错误，确保所有响应使用统一信封
 
 import type { ErrorHandler } from "hono";
+import { ZodError } from "zod";
 
 export const errorHandler: ErrorHandler = (err, c) => {
   const requestId = c.get("requestId") ?? "unknown";
   console.error(`[${requestId}]`, err);
+
+  // Zod 校验错误 → 统一信封
+  if (err instanceof ZodError) {
+    return c.json(
+      {
+        request_id: requestId,
+        status: "error",
+        error: {
+          code: "VALIDATION_ERROR",
+          message: err.issues.map((i) => i.message).join("; "),
+          detail: err.issues,
+        },
+        meta: {
+          at: new Date().toISOString(),
+          took_ms: 0,
+        },
+      },
+      400
+    );
+  }
 
   // HTTPException（如 404）使用自带 status
   if ("getResponse" in err && typeof (err as any).getResponse === "function") {
