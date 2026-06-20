@@ -5,8 +5,8 @@
 这个分支已经刻意移除了之前的原型代码，改成面向长期演进的服务化骨架，核心技术方向如下：
 
 - `Python`：模型相关服务
-- `Go`：编排层和业务 API
-- `TypeScript`：管理后台
+- `TypeScript`：编排层、业务 API 和管理后台
+- `Go`：原编排层（`orchestrator-go`，保留作为对照参考）
 - `LiveKit`：实时音视频传输
 - `SRS`：可选的 RTMP/HLS 分发
 - `vLLM`：自托管 LLM 推理
@@ -26,7 +26,7 @@ shared/
 
 ## 服务清单
 
-- `avastack-orchestrator`：目录 `services/orchestrator-go`，负责会话编排、服务路由、控制面 API
+- `avastack-orchestrator`：目录 `services/orchestrator-ts`，负责会话编排、服务路由、控制面 API（TypeScript + Hono + SQLite）
 - `avastack-asr`：目录 `services/model-asr-python`，负责 ASR 服务边界
 - `avastack-tts`：目录 `services/model-tts-python`，负责 TTS 服务边界
 - `avastack-avatar`：目录 `services/model-avatar-python`，负责数字人渲染服务边界
