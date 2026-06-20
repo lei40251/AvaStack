@@ -12,5 +12,7 @@
 </template>
 
 <script setup lang="ts">
-// 根组件仅负责布局结构，不包含业务逻辑
+// 根组件仅负责布局结构
+// AppSidebar 和 AppHeader 由 Nuxt 自动从 components/ 导入
 </script>
+

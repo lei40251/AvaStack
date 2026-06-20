@@ -3,10 +3,10 @@
 
 import type { ApiEnvelope, Session, CreateSessionRequest, UpdateSessionRequest, ServicesHealthResponse, InfoResponse } from "~/types/contracts";
 
-const config = useRuntimeConfig();
-const BASE = config.public.orchestratorBaseUrl as string;
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const config = useRuntimeConfig();
+  const BASE = config.public.orchestratorBaseUrl as string;
+
   const resp = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
