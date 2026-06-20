@@ -6,7 +6,6 @@
 
 - `Python`：模型相关服务
 - `TypeScript`：编排层、业务 API 和管理后台
-- `Go`：原编排层（`orchestrator-go`，保留作为对照参考）
 - `LiveKit`：实时音视频传输
 - `SRS`：可选的 RTMP/HLS 分发
 - `vLLM`：自托管 LLM 推理

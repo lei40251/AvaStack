@@ -71,8 +71,7 @@ $ErrorActionPreference = "Stop"
 # ════════════════════════════════════════════════════════════════════════════
 $script:RequiredVersionMap = @{
     Python = [Version]"3.11.0"   # ASR/TTS/Avatar/LLM 等 Python 微服务的最低版本
-    Go     = [Version]"1.22.0"   # orchestrator-go 编排器的最低版本
-    Node   = [Version]"20.0.0"   # admin-web 管理后台的最低 LTS 版本
+    Node   = [Version]"20.0.0"   # admin-web 和 orchestrator-ts 的最低 LTS 版本
 }
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1326,8 +1325,7 @@ function Write-DockerDesktopProxyGuide {
 
 .DESCRIPTION
     列出本地开发模式下各服务的依赖安装命令：
-    - Go：go mod download（orchestrator-go）
-    - Node.js：npm install（admin-web）
+    - Node.js：npm install（admin-web / orchestrator-ts）
     - Python：pip install -r requirements.txt（各模型微服务）
 
 .PARAMETER PythonCommand
@@ -1338,13 +1336,12 @@ function Write-ProjectDependencyGuide {
 
     Write-Host ""
     Write-Host "环境工具就绪后，按下面步骤安装项目依赖：" -ForegroundColor Yellow
-    Write-Host "  Go：" -ForegroundColor Green
-    Write-Host "    Set-Location services/orchestrator-go" -ForegroundColor Cyan
-    Write-Host "    go mod download" -ForegroundColor Cyan
-    Write-Host "    Set-Location ../.." -ForegroundColor Cyan
-    Write-Host ""
     Write-Host "  Node.js：" -ForegroundColor Green
     Write-Host "    Set-Location services/admin-web" -ForegroundColor Cyan
+    Write-Host "    npm install" -ForegroundColor Cyan
+    Write-Host "    Set-Location ../.." -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "    Set-Location services/orchestrator-ts" -ForegroundColor Cyan
     Write-Host "    npm install" -ForegroundColor Cyan
     Write-Host "    Set-Location ../.." -ForegroundColor Cyan
     Write-Host ""

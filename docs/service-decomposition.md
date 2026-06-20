@@ -2,7 +2,9 @@
 
 ## 控制面
 
-### `services/orchestrator-go` / `avastack-orchestrator`
+### `services/orchestrator-ts` / `avastack-orchestrator`
+
+TypeScript + Hono + SQLite。
 
 职责：
 

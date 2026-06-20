@@ -532,9 +532,9 @@ write_project_dependency_guide() {
   local python_command="$1"
   printf '\n'
   print_warn "环境工具就绪后，按下面步骤安装项目依赖："
-  print_success "Go："
-  printf '%b%s%b\n' "$COLOR_CYAN" "  cd services/orchestrator-go && go mod download && cd ../.." "$COLOR_RESET"
-  print_success "Node.js："
+  print_success "Node.js（orchestrator-ts）："
+  printf '%b%s%b\n' "$COLOR_CYAN" "  cd services/orchestrator-ts && npm install && cd ../.." "$COLOR_RESET"
+  print_success "Node.js（admin-web）："
   printf '%b%s%b\n' "$COLOR_CYAN" "  cd services/admin-web && npm install && cd ../.." "$COLOR_RESET"
   print_success "Python："
   printf '%b%s%b\n' "$COLOR_CYAN" "  $python_command -m pip install -r services/model-asr-python/requirements.txt" "$COLOR_RESET"

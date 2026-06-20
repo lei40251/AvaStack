@@ -1,6 +1,5 @@
 // src/config/env.ts
-// 根据 Go 版 internal/config/config.go 的环境变量约定改写
-// 环境变量名与现有 .env.example / compose.yaml 保持兼容
+// 环境变量统一管理，所有配置项支持默认值
 
 export interface AppConfig {
   port: number;
