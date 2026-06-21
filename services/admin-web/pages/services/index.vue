@@ -30,10 +30,15 @@ import type { ServicesHealthResponse } from "~/types/contracts";
 const api = useApi();
 const lastRefresh = ref<string | null>(null);
 
-const { data: health, loading, error } = usePolling<ServicesHealthResponse>(
+const { data: health, loading, error, start } = usePolling<ServicesHealthResponse>(
   () => api.getServicesHealth(),
   10000
 );
+
+onMounted(() => {
+  console.log("[services] onMounted, calling start()");
+  start();
+});
 
 watch(health, () => {
   if (health.value) {

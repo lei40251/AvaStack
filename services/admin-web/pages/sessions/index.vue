@@ -29,12 +29,12 @@ import type { Session } from "~/types/contracts";
 const api = useApi();
 const creating = ref(false);
 
-const { data: sessions, loading, error, refresh } = usePolling<Session[]>(
+const { data: sessions, loading, error, start, refresh } = usePolling<Session[]>(
   () => api.getSessions(),
   5000
 );
 
-onMounted(() => refresh());
+onMounted(() => start());
 
 async function createSession() {
   creating.value = true;

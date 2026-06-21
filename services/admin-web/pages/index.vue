@@ -40,17 +40,20 @@ import type { Session } from "~/types/contracts";
 
 const api = useApi();
 
-const { data: sessions, loading, refresh } = usePolling<Session[]>(
+const { data: sessions, loading, start: startSessions } = usePolling<Session[]>(
   () => api.getSessions(),
   10000
 );
 
-const { data: health, loading: healthLoading } = usePolling(
+const { data: health, loading: healthLoading, start: startHealth } = usePolling(
   () => api.getServicesHealth(),
   30000
 );
 
-onMounted(() => refresh());
+onMounted(() => {
+  startSessions();
+  startHealth();
+});
 
 const activeCount = computed(() =>
   sessions.value?.filter((s) => s.status === "active").length ?? 0
