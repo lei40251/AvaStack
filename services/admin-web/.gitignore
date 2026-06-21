@@ -1,1 +1,4 @@
 .nuxt
+.output
+node_modules
+nul
